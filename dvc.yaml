@@ -1,0 +1,10 @@
+stages:
+  unzip:
+    cmd: python scripts/unzip_dataset.py
+    deps:
+      - data/raw/ecommerce-dataset.zip
+    outs:
+      - data/interim/events.csv
+      - data/interim/item_properties_part1.csv
+      - data/interim/item_properties_part2.csv
+      - data/interim/category_tree.csv

@@ -1,0 +1,22 @@
+schema: '2.0'
+stages:
+  unzip:
+    cmd: python scripts/unzip_dataset.py
+    deps:
+    - path: data/raw/ecommerce-dataset.zip
+      hash: md5
+      md5: 9c8a6e502a5e71a00e49c0ac8b95a87f
+      size: 304719974
+    outs:
+    - path: data/interim/category_tree.csv
+      hash: md5
+      md5: f0e1eb878ae66209004112f6355d7e83
+      size: 14454
+    - path: data/interim/events.csv
+      hash: md5
+      md5: fddaf7c1c6a9df23a726500a08ffdd7e
+      size: 94237913
+    - path: data/interim/item_properties_part1.csv
+      hash: md5
+      md5: cb43a0682a1af76f1c1b60f9163ae47b
+      size: 484315749
