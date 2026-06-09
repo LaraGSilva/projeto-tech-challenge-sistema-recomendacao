@@ -20,3 +20,7 @@ stages:
       hash: md5
       md5: cb43a0682a1af76f1c1b60f9163ae47b
       size: 484315749
+    - path: data/interim/item_properties_part2.csv
+      hash: md5
+      md5: e74ec953e7b192920b195dfd82dc2a4e
+      size: 408929907
