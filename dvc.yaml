@@ -8,3 +8,30 @@ stages:
       - data/interim/item_properties_part1.csv
       - data/interim/item_properties_part2.csv
       - data/interim/category_tree.csv
+
+  preprocess:
+    cmd: uv run python src/recommender/data/preprocess.py
+    deps: [data/interim/events.csv, data/interim/item_properties_part1.csv,
+           data/interim/item_properties_part2.csv]
+    outs: [data/processed/interactions.parquet, data/processed/items.parquet]
+
+  feature_engineering:
+    cmd: uv run python src/recommender/features/build.py
+    deps: [data/processed/interactions.parquet]
+    outs: [data/features/user_item_matrix.npz, data/features/mappings.pkl]
+
+  train_baselines:
+    cmd: uv run python src/recommender/models/train_baselines.py
+    deps: [data/features/user_item_matrix.npz, data/features/mappings.pkl]
+    outs: [models/baselines/]
+
+  train_neural:
+    cmd: uv run python src/recommender/models/train_neural.py
+    deps: [data/features/user_item_matrix.npz, data/processed/items.parquet]
+    outs: [models/neural/best_model.pt]
+
+  evaluate:
+    cmd: uv run python src/recommender/evaluation/compare.py
+    deps: [models/baselines/, models/neural/best_model.pt]
+    metrics: [reports/metrics.json]
+    plots: [reports/metrics_comparison.csv]
