@@ -1,0 +1,5 @@
+Modelo,precision_at_10,recall_at_10,ndcg_at_10,coverage,n_usuarios_avaliados
+KNN User-CF,0.0055,0.013,0.0103,0.1594,1814
+Popularidade,0.0032,0.0065,0.0068,0.0002,1814
+MLP Embeddings,0.0034,0.0055,0.0048,0.1506,1814
+SVD,0.0017,0.0029,0.0028,0.0116,1814
