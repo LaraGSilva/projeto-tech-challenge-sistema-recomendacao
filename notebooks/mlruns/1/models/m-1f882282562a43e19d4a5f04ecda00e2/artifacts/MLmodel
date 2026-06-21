@@ -1,0 +1,22 @@
+artifact_path: file:///c:/Users/lara-/workspace/projeto-tech-challenge-sistema-recomendacao/notebooks/mlruns/1/models/m-1f882282562a43e19d4a5f04ecda00e2/artifacts
+flavors:
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.9.0
+    skops_trusted_types: null
+is_signature_from_type_hint: false
+mlflow_version: 3.13.0
+model_id: m-1f882282562a43e19d4a5f04ecda00e2
+model_size_bytes: 4896386
+model_uuid: m-1f882282562a43e19d4a5f04ecda00e2
+prompts: null
+run_id: 37fb0c6a58354fd5a6236f9f68ba3365
+signature:
+  inputs: '[{"name": "visitor_id", "type": "tensor", "tensor-spec": {"dtype": "int64",
+    "shape": [-1]}}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "int64", "shape": [-1]}}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2026-06-21 19:24:58.230481'

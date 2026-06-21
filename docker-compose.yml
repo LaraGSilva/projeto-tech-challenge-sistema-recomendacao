@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  mlflow:
+    image: bitnami/mlflow:latest
+    container_name: recommender_mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mapeia o banco SQLite e a pasta de artefatos locais para dentro do container
+      - ./mlflow.db:/app/mlflow.db
+      - ./notebooks/mlruns:/app/mlruns
+    command: mlflow server --backend-store-uri sqlite:////app/mlflow.db --default-artifact-root /app/mlruns --host 0.0.0.0 --port 5000
+
+  recommender_app:
+    build: .
+    container_name: recommender_app
+    volumes:
+      # Espelha o código local para desenvolvimento em tempo real
+      - .:/app
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    depends_on:
+      - mlflow
+    # Mantém o container ativo para você rodar os scripts via terminal (ex: docker exec -it recommender_app bash)
+    command: tail -f /dev/null

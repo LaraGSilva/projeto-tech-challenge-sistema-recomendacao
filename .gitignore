@@ -5,3 +5,4 @@ data/processed/
 models/*.pt
 __pycache__/
 .dvc
+.env
