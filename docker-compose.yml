@@ -7,20 +7,28 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      # Mapeia o banco SQLite e a pasta de artefatos locais para dentro do container
-      - ./mlflow.db:/app/mlflow.db
-      - ./notebooks/mlruns:/app/mlruns
-    command: mlflow server --backend-store-uri sqlite:////app/mlflow.db --default-artifact-root /app/mlruns --host 0.0.0.0 --port 5000
+      - ./mlruns:/mlruns
+      - ./mlflow.db:/mlflow.db
+    command: >
+      mlflow server 
+      --backend-store-uri sqlite:////mlflow.db 
+      --default-artifact-root /mlruns 
+      --host 0.0.0.0 
+      --port 5000
 
   recommender_app:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
     container_name: recommender_app
     volumes:
-      # Espelha o código local para desenvolvimento em tempo real
       - .:/app
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PYTHONUNBUFFERED=1
     depends_on:
       - mlflow
-    # Mantém o container ativo para você rodar os scripts via terminal (ex: docker exec -it recommender_app bash)
-    command: tail -f /dev/null
+    # Comando para permitir que o DVC e scripts rode, mantendo o container vivo
+    tty: true
+    stdin_open: true
+    command: /bin/bash

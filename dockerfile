@@ -1,38 +1,36 @@
-# ==========================================
-# Stage 1: Builder
-# ==========================================
-FROM python:3.10-slim AS builder
+# Estágio 1: Builder
+FROM python:3.11-slim AS builder
 
-# Instalar o uv diretamente da imagem oficial
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Instala uv
+RUN pip install uv
 
-# Configurar diretório de trabalho
+# Define diretório de trabalho
 WORKDIR /app
 
-# Copiar apenas os arquivos de dependência primeiro para aproveitar o cache do Docker
+# Copia arquivos de dependência
 COPY pyproject.toml uv.lock ./
 
-# Criar um ambiente virtual e instalar as dependências
+# Instala dependências em um diretório específico
 RUN uv venv /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+RUN uv pip install --no-cache .
 
-# Sincronizar as dependências garantindo que o lockfile seja respeitado
-RUN uv sync --frozen --no-dev
-
-# ==========================================
-# Stage 2: Runtime
-# ==========================================
-FROM python:3.10-slim AS runtime
+# Estágio 2: Runtime
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
-# Copiar o ambiente virtual do stage builder
+# Copia apenas o ambiente virtual montado no estágio anterior
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copiar o restante do código da aplicação
+# Copia o código fonte
 COPY . .
 
-# O comando padrão pode ser ajustado para iniciar uma API FastAPI ou rodar um script de treino
-CMD ["python", "src/recommender/models/train_baselines.py"]
+# Define variáveis de ambiente
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Comando para rodar a pipeline ou o serviço
+CMD ["python", "main.py"]

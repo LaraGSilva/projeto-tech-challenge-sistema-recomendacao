@@ -1,37 +1,40 @@
 stages:
-  unzip:
-    cmd: python scripts/unzip_dataset.py
+  # ==========================================
+  # STAGE 1: Geração de Features
+  # ==========================================
+  build_features:
+    cmd: python scripts/build_features_local.py
     deps:
-      - data/raw/ecommerce-dataset.zip
+      - scripts/build_features_local.py
+      - data/interim/events.csv
     outs:
+      - data/features/user_item_matrix.npz
+      - data/features/mappings.pkl
+
+  # ==========================================
+  # STAGE 2: Treinamento dos Baselines (Scikit-Learn)
+  # ==========================================
+  train_baselines:
+    cmd: python src/recommender/models/train_baselines.py
+    deps:
+      - src/recommender/models/train_baselines.py
+      - src/recommender/evaluation/evaluate.py
+      - data/features/user_item_matrix.npz
+      - data/features/mappings.pkl
+    outs:
+      - models/baselines/
+
+  # ==========================================
+  # STAGE 3: Treinamento da Rede Neural (PyTorch)
+  # ==========================================
+  train_neural:
+    # O script neural lê os dados interim e salva registros no MLflow/Model Registry
+    cmd: python -c "from src.recommender.models import train_neural; train_neural.main()"
+    deps:
+      - src/recommender/models/train_neural.py
+      - src/recommender/evaluation/evaluate.py
       - data/interim/events.csv
       - data/interim/item_properties_part1.csv
       - data/interim/item_properties_part2.csv
-      - data/interim/category_tree.csv
-
-  preprocess:
-    cmd: uv run python src/recommender/data/preprocess.py
-    deps: [data/interim/events.csv, data/interim/item_properties_part1.csv,
-           data/interim/item_properties_part2.csv]
-    outs: [data/processed/interactions.parquet, data/processed/items.parquet]
-
-  feature_engineering:
-    cmd: uv run python src/recommender/features/build.py
-    deps: [data/processed/interactions.parquet]
-    outs: [data/features/user_item_matrix.npz, data/features/mappings.pkl]
-
-  train_baselines:
-    cmd: uv run python src/recommender/models/train_baselines.py
-    deps: [data/features/user_item_matrix.npz, data/features/mappings.pkl]
-    outs: [models/baselines/]
-
-  train_neural:
-    cmd: uv run python src/recommender/models/train_neural.py
-    deps: [data/features/user_item_matrix.npz, data/processed/items.parquet]
-    outs: [models/neural/best_model.pt]
-
-  evaluate:
-    cmd: uv run python src/recommender/evaluation/compare.py
-    deps: [models/baselines/, models/neural/best_model.pt]
-    metrics: [reports/metrics.json]
-    plots: [reports/metrics_comparison.csv]
+    # O MLflow registra o modelo, então não há 'outs' obrigatórios de arquivo, 
+    # mas o DVC monitora a execução do código.
