@@ -24,3 +24,23 @@ stages:
       hash: md5
       md5: e74ec953e7b192920b195dfd82dc2a4e
       size: 408929907
+  build_features:
+    cmd: python scripts/build_features_local.py
+    deps:
+    - path: data/interim/events.csv
+      hash: md5
+      md5: fddaf7c1c6a9df23a726500a08ffdd7e
+      size: 94237913
+    - path: scripts/build_features_local.py
+      hash: md5
+      md5: d15932b8e37326a6f8bc3e8b8aba047d
+      size: 1628
+    outs:
+    - path: data/features/mappings.pkl
+      hash: md5
+      md5: cf498b7d6a8d9eedb42a49a8d0246295
+      size: 4059853
+    - path: data/features/user_item_matrix.npz
+      hash: md5
+      md5: 5ae29971618e247d607b7487c8e219c7
+      size: 1231027

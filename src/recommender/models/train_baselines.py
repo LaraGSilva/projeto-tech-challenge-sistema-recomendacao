@@ -1,6 +1,6 @@
 import pickle
 from pathlib import Path
-
+import sys
 import mlflow
 import mlflow.sklearn
 import numpy as np
@@ -10,6 +10,8 @@ from sklearn.decomposition import TruncatedSVD
 from sklearn.neighbors import NearestNeighbors
 
 # ── Importando as métricas padronizadas do projeto ────────────────────────────
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
+
 from src.recommender.evaluation.evaluate import avaliar_sistema_recomendacao
 
 # ── configuração ──────────────────────────────────────────────────────────────

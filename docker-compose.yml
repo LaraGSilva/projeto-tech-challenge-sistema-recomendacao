@@ -2,7 +2,8 @@ version: '3.8'
 
 services:
   mlflow:
-    image: bitnami/mlflow:latest
+    # Substitua a imagem por uma versão estável
+    image: ghcr.io/mlflow/mlflow:latest
     container_name: recommender_mlflow
     ports:
       - "5000:5000"

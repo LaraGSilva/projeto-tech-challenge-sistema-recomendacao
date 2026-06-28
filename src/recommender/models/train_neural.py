@@ -13,13 +13,16 @@ import pyspark.sql.functions as F
 import mlflow
 import mlflow.pytorch
 from mlflow.models import infer_signature
-from typing import Dict, List, Tuple, Any
 from src.recommender.evaluation.evaluate import avaliar_sistema_recomendacao
+from typing import Dict, List, Tuple, Any
+from src.recommender.utils.config_loader import load_config
 
 # =============================================================================
 # 1. CLASSES DO PYTORCH (Dataset, Modelo e Loss)
 # =============================================================================
 
+# Carregamento das configs
+model_cfg: Dict[str, Any] = load_config("model_params")
 
 class RetailRocketBPRDatasetCPU(Dataset):
     """Dataset otimizado para CPU. Sorteia itens negativos de forma vetorizada."""

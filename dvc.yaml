@@ -28,13 +28,11 @@ stages:
   # STAGE 3: Treinamento da Rede Neural (PyTorch)
   # ==========================================
   train_neural:
-    # O script neural lê os dados interim e salva registros no MLflow/Model Registry
-    cmd: python -c "from src.recommender.models import train_neural; train_neural.main()"
+    cmd: python -c "from src.recommender.models.train_neural import main; main()"
     deps:
       - src/recommender/models/train_neural.py
       - src/recommender/evaluation/evaluate.py
       - data/interim/events.csv
       - data/interim/item_properties_part1.csv
       - data/interim/item_properties_part2.csv
-    # O MLflow registra o modelo, então não há 'outs' obrigatórios de arquivo, 
-    # mas o DVC monitora a execução do código.
+      - configs/model_params.yaml

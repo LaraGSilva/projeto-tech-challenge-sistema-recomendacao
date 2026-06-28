@@ -29,6 +29,7 @@ interacoes = interacoes[interacoes["visitorid"].isin(usuarios_ativos)]
 # mappings id → índice
 user_to_idx = {u: i for i, u in enumerate(interacoes["visitorid"].unique())}
 item_to_idx = {it: i for i, it in enumerate(interacoes["itemid"].unique())}
+idx_to_user = {i: u for u, i in user_to_idx.items()}
 idx_to_item = {i: it for it, i in item_to_idx.items()}
 
 rows = interacoes["visitorid"].map(user_to_idx)
@@ -43,6 +44,7 @@ save_npz("data/features/user_item_matrix.npz", matrix)
 
 with open("data/features/mappings.pkl", "wb") as f:
     pickle.dump({
+        "idx_to_user": idx_to_user, # Agora sim, o inverso
         "user_to_idx": user_to_idx,
         "item_to_idx": item_to_idx,
         "idx_to_item": idx_to_item,
