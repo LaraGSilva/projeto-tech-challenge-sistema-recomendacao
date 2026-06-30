@@ -15,6 +15,8 @@ RUN uv venv /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN uv pip install --no-cache .
+RUN uv sync --no-dev --frozen
+
 
 # Estágio 2: Runtime
 FROM python:3.11-slim AS runtime

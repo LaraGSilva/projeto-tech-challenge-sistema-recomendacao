@@ -4,33 +4,27 @@ version = "0.1.0"
 description = "sistema de recomendacao do dataset Retailrocket"
 readme = "README.md"
 requires-python = ">=3.11"
+# Apenas o essencial para rodar o pipeline (Treino/Inferência)
 dependencies = [
     "dvc>=3.67.1",
+    "mlflow>=3.13.0",
+    "pyspark==3.5.7",
+    "scikit-learn>=1.9.0",
+    "torch>=2.12.0",
+    "pydantic-settings>=2.14.1",
+]
+
+[dependency-groups]
+dev = [
     "ipykernel>=7.3.0",
     "ipython>=9.14.1",
     "jupyter>=1.1.1",
     "matplotlib>=3.10.9",
     "matplotlib-inline>=0.2.2",
-    "mlflow>=3.13.0",
-    "pydantic-settings>=2.14.1",
-    "pyspark==3.5.7",
-    "scikit-learn>=1.9.0",
     "seaborn>=0.13.2",
-    "torch>=2.12.0",
-]
-
-[dependency-groups]
-dev = [
     "mypy>=2.1.0",
     "pre-commit>=4.6.0",
     "pytest>=9.0.3",
     "pytest-mock>=3.15.1",
     "ruff>=0.15.16",
 ]
-
-[tool.ruff]
-line-length = 88
-select = ["E", "F", "I", "N", "UP"]
-
-[tool.ruff.lint]
-max-doc-length = 120

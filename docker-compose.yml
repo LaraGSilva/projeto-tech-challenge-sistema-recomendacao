@@ -1,8 +1,5 @@
-version: '3.8'
-
 services:
   mlflow:
-    # Substitua a imagem por uma versão estável
     image: ghcr.io/mlflow/mlflow:latest
     container_name: recommender_mlflow
     ports:
@@ -10,26 +7,26 @@ services:
     volumes:
       - ./mlruns:/mlruns
       - ./mlflow.db:/mlflow.db
+    # Adicionamos a flag --host 0.0.0.0 e a variável para desabilitar a checagem restritiva
+    environment:
+      - MLFLOW_HOST=0.0.0.0
+      - MLFLOW_SERVER_ALLOWED_HOSTS=* 
     command: >
       mlflow server 
       --backend-store-uri sqlite:////mlflow.db 
       --default-artifact-root /mlruns 
       --host 0.0.0.0 
       --port 5000
+      --allowed-hosts "*"
 
   recommender_app:
-    build: 
-      context: .
-      dockerfile: Dockerfile
+    build: .
     container_name: recommender_app
     volumes:
       - .:/app
     environment:
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
-      - PYTHONUNBUFFERED=1
-    depends_on:
-      - mlflow
-    # Comando para permitir que o DVC e scripts rode, mantendo o container vivo
+      - MLFLOW_TRACKING_URI=http://recommender_mlflow:5000
+    # Adicione ou substitua o comando por este:
     tty: true
     stdin_open: true
-    command: /bin/bash
+    command: tail -f /dev/null

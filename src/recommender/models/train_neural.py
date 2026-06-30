@@ -241,8 +241,8 @@ def train_model(df_train_pandas: pd.DataFrame, item_popularity: Dict, item_to_ca
             optimizer.step()
             epoch_loss += loss.item()
 
-        print(f"Época {epoch} Finalizada | Loss Média: {
-              epoch_loss/len(train_loader):.4f}")
+        print(f'Época {epoch} Finalizada | Loss Média: {
+              epoch_loss/len(train_loader):.4f}')
 
     return model
 

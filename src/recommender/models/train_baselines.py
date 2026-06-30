@@ -1,5 +1,6 @@
 import pickle
 from pathlib import Path
+import os
 import sys
 import mlflow
 import mlflow.sklearn
@@ -22,7 +23,10 @@ MODELS_DIR = Path("models/baselines")
 N_RECS = 10
 SEED = 42
 
-mlflow.set_tracking_uri("http://localhost:5000")
+# Mude de 'http://localhost:5000' para a variável de ambiente
+# 
+tracking_uri = "http://recommender_mlflow:5000" 
+mlflow.set_tracking_uri(tracking_uri)
 mlflow.set_experiment("retailrocket-recommender")
 
 # ── carregamento dos dados ────────────────────────────────────────────────────
@@ -63,7 +67,14 @@ def train_popularity(
     gt_dict: dict,
     n_items_total: int
 ) -> None:
+    
+    df_dataset = pd.DataFrame([gt_dict]) # Ou pd.DataFrame(gt_dict) se o dict for tabular
+    dataset = mlflow.data.from_pandas(df_dataset, name="dataset_RetailRocket_Events_and_Properties")
+    
     with mlflow.start_run(run_name="popularity"):
+        
+        mlflow.log_input(dataset, context="training/test")      
+
         mlflow.log_param("model_type", "popularity")
         mlflow.log_param("n_recommendations", N_RECS)
 
@@ -97,7 +108,7 @@ def train_popularity(
         model_path = MODELS_DIR / "popularity_top_items.npy"
         np.save(model_path, top_items_idx)
         mlflow.log_artifact(str(model_path))
-
+        #mlflow.pyfunc.log_model(,'popularity ranking')
         print(f"[popularity] {metrics}")
 
 # ── baseline 2: knn user-based ────────────────────────────────────────────────
@@ -111,7 +122,12 @@ def train_knn(
     n_items_total: int,
     k_neighbors: int = 20,
 ) -> None:
+    
     with mlflow.start_run(run_name="knn_user_cf"):
+        df_dataset = pd.DataFrame([gt_dict]) # Ou pd.DataFrame(gt_dict) se o dict for tabular
+        dataset = mlflow.data.from_pandas(df_dataset, name="dataset_RetailRocket_Events_and_Properties")
+    
+        mlflow.log_input(dataset, context="training/test")  
         mlflow.log_param("model_type", "knn_user_cf")
         mlflow.log_param("k_neighbors", k_neighbors)
         mlflow.log_param("metric", "cosine")
@@ -162,6 +178,7 @@ def train_knn(
         with open(model_path, "wb") as f:
             pickle.dump(knn, f)
         mlflow.log_artifact(str(model_path))
+        mlflow.sklearn.log_model(knn, 'knn model')
 
         print(f"[knn] {metrics}")
 
@@ -177,6 +194,8 @@ def train_svd(
     n_components: int = 50,
 ) -> None:
     with mlflow.start_run(run_name="svd"):
+        dataset = mlflow.data.from_pandas(gt_dict, name="dataset_RetailRocket_Events_and_Properties")
+        mlflow.log_input(dataset, context="training/test")
         mlflow.log_param("model_type", "svd")
         mlflow.log_param("n_components", n_components)
         mlflow.log_param("n_recommendations", N_RECS)
