@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 import sys
 import mlflow
+from mlflow.models import infer_signature
 import mlflow.sklearn
 import numpy as np
 import pandas as pd
@@ -39,8 +40,6 @@ def load_artifacts() -> tuple[csr_matrix, dict]:
     return matrix, mappings
 
 # ── preparação do ground truth para o avaliador ───────────────────────────────
-
-
 def _build_ground_truth(matrix: csr_matrix, mappings: dict, test_users_idx: list[int]) -> dict:
     """Reconstrói o gt_dict (user_id -> list[item_id]) a partir da matriz esparsa."""
     gt_dict = {}
@@ -58,7 +57,6 @@ def _build_ground_truth(matrix: csr_matrix, mappings: dict, test_users_idx: list
     return gt_dict
 
 # ── baseline 1: popularity ────────────────────────────────────────────────────
-
 
 def train_popularity(
     matrix: csr_matrix,
@@ -113,7 +111,6 @@ def train_popularity(
 
 # ── baseline 2: knn user-based ────────────────────────────────────────────────
 
-
 def train_knn(
     matrix: csr_matrix,
     mappings: dict,
@@ -124,7 +121,7 @@ def train_knn(
 ) -> None:
     
     with mlflow.start_run(run_name="knn_user_cf"):
-        df_dataset = pd.DataFrame([gt_dict]) # Ou pd.DataFrame(gt_dict) se o dict for tabular
+        df_dataset = pd.DataFrame([gt_dict]) 
         dataset = mlflow.data.from_pandas(df_dataset, name="dataset_RetailRocket_Events_and_Properties")
     
         mlflow.log_input(dataset, context="training/test")  
@@ -178,9 +175,24 @@ def train_knn(
         with open(model_path, "wb") as f:
             pickle.dump(knn, f)
         mlflow.log_artifact(str(model_path))
-        mlflow.sklearn.log_model(knn, 'knn model')
 
-        print(f"[knn] {metrics}")
+    # # 4. Assinatura Corrigida (Inputs e Outputs condizentes com a realidade)
+    # sample_user = np.array([12345], dtype=np.int64)
+    # # Output simulado contendo uma lista de 10 IDs reais de itens do catálogo
+    # sample_output = np.array(list(idx_to_item.values())[:N_RECS], dtype=np.int64)
+    
+    # signature = infer_signature(
+    #     model_input={"visitor_id": sample_user},
+    #     model_output=sample_output
+    # )
+
+    # mlflow.sklearn.log_model(
+    #         sk_model=recommend_fn,
+    #         artifact_path="modelo-knn-retailrocket",
+    #         signature=signature,
+    #         registered_model_name="knn--recommendation")
+
+    print(f"[knn] {metrics}")
 
 # ── baseline 3: svd matrix factorization ─────────────────────────────────────
 
@@ -193,8 +205,11 @@ def train_svd(
     n_items_total: int,
     n_components: int = 50,
 ) -> None:
+    
     with mlflow.start_run(run_name="svd"):
-        dataset = mlflow.data.from_pandas(gt_dict, name="dataset_RetailRocket_Events_and_Properties")
+        df_dataset = pd.DataFrame([gt_dict]) # Ou pd.DataFrame(gt_dict) se o dict for tabular
+        dataset = mlflow.data.from_pandas(df_dataset, name="dataset_RetailRocket_Events_and_Properties")
+      
         mlflow.log_input(dataset, context="training/test")
         mlflow.log_param("model_type", "svd")
         mlflow.log_param("n_components", n_components)
@@ -238,7 +253,7 @@ def train_svd(
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
         np.save(MODELS_DIR / "svd_user_factors.npy", user_factors)
         np.save(MODELS_DIR / "svd_item_factors.npy", item_factors)
-        mlflow.sklearn.log_model(svd, "svd_model")
+        # mlflow.sklearn.log_model(svd, "svd_model")
 
         print(f"[svd] {metrics}")
 

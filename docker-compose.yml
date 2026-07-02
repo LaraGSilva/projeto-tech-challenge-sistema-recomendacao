@@ -7,7 +7,6 @@ services:
     volumes:
       - ./mlruns:/mlruns
       - ./mlflow.db:/mlflow.db
-    # Adicionamos a flag --host 0.0.0.0 e a variável para desabilitar a checagem restritiva
     environment:
       - MLFLOW_HOST=0.0.0.0
       - MLFLOW_SERVER_ALLOWED_HOSTS=* 
@@ -26,7 +25,11 @@ services:
       - .:/app
     environment:
       - MLFLOW_TRACKING_URI=http://recommender_mlflow:5000
-    # Adicione ou substitua o comando por este:
     tty: true
     stdin_open: true
     command: tail -f /dev/null
+    # Adicione a seção abaixo:
+    deploy:
+      resources:
+        limits:
+          memory: 4g

@@ -44,3 +44,32 @@ stages:
       hash: md5
       md5: 5ae29971618e247d607b7487c8e219c7
       size: 1231027
+  train_baselines:
+    cmd: python src/recommender/models/train_baselines.py
+    deps:
+    - path: data/features/mappings.pkl
+      hash: md5
+      md5: cf498b7d6a8d9eedb42a49a8d0246295
+      size: 4059853
+      isexec: true
+    - path: data/features/user_item_matrix.npz
+      hash: md5
+      md5: 5ae29971618e247d607b7487c8e219c7
+      size: 1231027
+      isexec: true
+    - path: src/recommender/evaluation/evaluate.py
+      hash: md5
+      md5: bc65939e40118e086066efb02be94938
+      size: 4005
+      isexec: true
+    - path: src/recommender/models/train_baselines.py
+      hash: md5
+      md5: 7048a137b1a0f7274f6801c1a8b53e0a
+      size: 11259
+      isexec: true
+    outs:
+    - path: models/baselines/
+      hash: md5
+      md5: 926ac6b38193d095db5ea5d3bddfb60c.dir
+      size: 57998962
+      nfiles: 4
