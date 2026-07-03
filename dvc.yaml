@@ -6,7 +6,7 @@ stages:
     cmd: python scripts/build_features_local.py
     deps:
       - scripts/build_features_local.py
-      - data/interim/events.csv
+      - data/raw/events.csv
     outs:
       - data/features/user_item_matrix.npz
       - data/features/mappings.pkl
@@ -32,7 +32,7 @@ stages:
     deps:
       - src/recommender/models/train_neural.py
       - src/recommender/evaluation/evaluate.py
-      - data/interim/events.csv
-      - data/interim/item_properties_part1.csv
-      - data/interim/item_properties_part2.csv
+      - data/raw/events.csv
+      - data/raw/item_properties_part1.csv
+      - data/raw/item_properties_part2.csv
       - configs/model_params.yaml

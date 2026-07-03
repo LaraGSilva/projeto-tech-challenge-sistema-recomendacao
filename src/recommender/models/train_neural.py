@@ -1,21 +1,25 @@
 """
 Módulo de treinamento do modelo NeuMF otimizado para baixa memória.
 """
-from src.recommender.evaluation.evaluate import avaliar_sistema_recomendacao
+from pathlib import Path
 import sys
+
+raiz_projeto = Path(__file__).resolve().parents[3]
+sys.path.append(str(raiz_projeto))
+
+from shared.ml.evaluate_metrics import avaliar_sistema_recomendacao
+
 import gc
 import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
-from pathlib import Path
+
 from torch.utils.data import Dataset, DataLoader
 import mlflow
 import mlflow.pytorch
 from mlflow.models import infer_signature
 
-raiz_projeto = Path(__file__).resolve().parents[3]
-sys.path.append(str(raiz_projeto))
 
 # 2. Agora os imports funcionam porque a raiz está no sys.path
 
@@ -50,7 +54,7 @@ class NeuMF_Light(nn.Module):
 
 def load_and_prep_data():
     print("Lendo CSV diretamente com Pandas...")
-    df_pd = pd.read_csv("data/interim/events.csv",
+    df_pd = pd.read_csv("data/raw/events.csv",
                         usecols=['visitorid', 'itemid', 'event', 'timestamp'],
                         dtype={'visitorid': 'int32', 'itemid': 'int32'})
 
@@ -98,6 +102,8 @@ def recommend_wrapper_mlp_fast(visitor_id, model, candidatos, idx_to_item, user_
 
 def main():
     try:
+
+        
         N_RECS = 10
 
         df, u_map, i_map, item_to_idx = load_and_prep_data()
@@ -166,7 +172,7 @@ def main():
             test_users=list(u_map.values()),
             gt_dict=gt_dict,
             n_items_total=n_items,
-            k=10,
+            k=N_RECS,
             model=model,
             idx_to_item=i_map,
             user_to_idx={v: k for k, v in u_map.items()},
@@ -185,6 +191,13 @@ def main():
         mlflow.pytorch.log_model(model, "modelo-neumf")
         print("Processo finalizado!")
 
+        # Salvar para o Service
+        mappings = {
+            'user_to_idx': {v: k for k, v in u_map.items()}, # Invertido para o formato do service
+            'item_to_idx': item_to_idx
+        }
+        np.save('models/mappings.npy', mappings)
+        torch.save(model.state_dict(), 'models/neumf_model.pth')
     except Exception as e:
         import traceback
         traceback.print_exc()

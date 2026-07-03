@@ -7,7 +7,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix, save_npz
 
 # carrega o que você já tem do EDA
-df = pd.read_csv("data/interim/events.csv")
+df = pd.read_csv("data/raw/events.csv")
 
 df["peso"] = df["event"].map({
     "view": 1,

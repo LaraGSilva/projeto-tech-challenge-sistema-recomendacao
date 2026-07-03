@@ -1,6 +1,6 @@
 import math
 import pytest
-from src.recommender.evaluation.evaluate import (
+from shared.ml.evaluate_metrics import (
     _calculate_precision_at_k,
     _calculate_recall_at_k,
     _calculate_ndcg_at_k,

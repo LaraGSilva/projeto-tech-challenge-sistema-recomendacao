@@ -1,6 +1,6 @@
 paths:
   raw_data: "data/raw/events.csv"
-  interim_data: "data/interim/"
+  raw_data: "data/raw/"
   features_output: "data/features/"
   models_output: "models/"
 

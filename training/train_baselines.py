@@ -10,11 +10,12 @@ import pandas as pd
 from scipy.sparse import csr_matrix, load_npz
 from sklearn.decomposition import TruncatedSVD
 from sklearn.neighbors import NearestNeighbors
+from shared.utils.config import load_config
 
 # ── Importando as métricas padronizadas do projeto ────────────────────────────
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
-from src.recommender.evaluation.evaluate import avaliar_sistema_recomendacao
+from shared.ml.evaluate_metrics import avaliar_sistema_recomendacao
 
 # ── configuração ──────────────────────────────────────────────────────────────
 
@@ -261,6 +262,7 @@ def train_svd(
 
 
 def main() -> None:
+    cfg = load_config() # Carrega tudo
     matrix, mappings = load_artifacts()
 
     n_users = matrix.shape[0]
@@ -276,8 +278,24 @@ def main() -> None:
 
     train_popularity(matrix, mappings, test_users_original,
                      gt_dict, n_items_total)
-    train_knn(matrix, mappings, test_users_original, gt_dict, n_items_total)
-    train_svd(matrix, mappings, test_users_original, gt_dict, n_items_total)
+    
+    train_knn(
+        matrix, 
+        mappings,
+        test_users_original,
+        gt_dict, 
+        n_items_total, 
+        k_neighbors=cfg['baselines']['knn']['k_neighbors'])
+
+
+    train_svd(
+        matrix, 
+        mappings, 
+        test_users_original, 
+        gt_dict, 
+        n_items_total,
+        n_components=cfg['baselines']['svd']['n_components'] 
+    )
 
 
 if __name__ == "__main__":
