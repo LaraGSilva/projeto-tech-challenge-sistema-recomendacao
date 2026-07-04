@@ -5,3 +5,4 @@ data/raw/
 mlruns/
 .dvc/cache/
 mlartifacts/
+.mlflow.db

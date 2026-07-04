@@ -78,8 +78,8 @@ def avaliar_sistema_recomendacao(
             continue
 
         # Chama a função wrapper do modelo para gerar as recomendações
-        recomendacoes = recommend_fn(user, k=k, **kwargs)
-        
+        recomendacoes = recommend_fn(user, k, n_items_total, **kwargs)
+
         # Registra os itens para o cálculo de cobertura de catálogo
         todos_itens_recomendados.update(recomendacoes[:k])
 

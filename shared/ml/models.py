@@ -5,7 +5,7 @@ from typing import List
 class NeuMF_RetailRocket_CPU(nn.Module):
     def __init__(self, n_users: int, n_items: int, n_categorias: int, item_to_cat_array: list,
                  mf_dim: int = 16, mlp_dim: int = 32, categoria_dim: int = 8,
-                 hidden_dims: List[int] = [128, 64], dropout: float = 0.1):
+                 hidden_dims: List[int] = [128, 64], dropout: float = 0.1, **kwargs):
         super().__init__()
         
         # Embeddings
@@ -14,6 +14,7 @@ class NeuMF_RetailRocket_CPU(nn.Module):
         self.user_mlp_embed = nn.Embedding(n_users, mlp_dim)
         self.item_mlp_embed = nn.Embedding(n_items, mlp_dim)
         self.cat_mlp_embed = nn.Embedding(n_categorias, categoria_dim)
+        self.mlp_dim = mlp_dim
 
         # Buffer para dados que não são parâmetros treináveis
         self.register_buffer("item_categoria_idx", torch.tensor(item_to_cat_array, dtype=torch.long))
@@ -51,8 +52,11 @@ class NeuMF_RetailRocket_CPU(nn.Module):
 
 class NeuMF_Light(nn.Module):
     """Modelo simples de Fatoração de Matrizes para baselines."""
-    def __init__(self, n_users: int, n_items: int, mf_dim: int = 16):
+    def __init__(self, n_users: int, n_items: int, mf_dim: int = 16, **kwargs):
         super().__init__()
+        # A inclusão de **kwargs aqui captura parâmetros extras passados pela factory
+        # como mlp_dim ou categoria_dim, evitando o erro de TypeError.
+        
         self.user_embed = nn.Embedding(n_users, mf_dim)
         self.item_embed = nn.Embedding(n_items, mf_dim)
         self.prediction_layer = nn.Linear(mf_dim, 1)

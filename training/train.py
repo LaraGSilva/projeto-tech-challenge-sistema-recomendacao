@@ -14,16 +14,32 @@ from shared.data.preprocessing import DefaultEventPreprocessor
 from shared.utils.config import load_config
 
 # --- Wrapper para a função de recomendação ---
-def recommend_wrapper_mlp_fast(user_idx, model, k, item_to_idx, idx_to_item, n_items_total):
-    """Transforma a predição do modelo em uma lista de recomendações."""
+def recommend_wrapper_mlp_fast(user_idx, k, n_items_total, model, **kwargs):
     model.eval()
+    idx_to_item = kwargs.get('idx_to_item')
+    
+    if idx_to_item is None:
+        raise ValueError("O argumento 'idx_to_item' é obrigatório no kwargs.")
+
     with torch.no_grad():
         u_t = torch.full((n_items_total,), user_idx, dtype=torch.long)
         i_t = torch.arange(n_items_total, dtype=torch.long)
         scores = model(u_t, i_t).numpy()
         
-    top_indices = np.argsort(scores)[::-1][:k]
-    return [idx_to_item[idx] for idx in top_indices]
+    # Ordena os scores
+    top_indices = np.argsort(scores)[::-1]
+    
+    recs = []
+    for idx in top_indices:
+        idx_int = int(idx) 
+        
+        if idx_int in idx_to_item:
+            recs.append(idx_to_item[idx_int])
+        
+        if len(recs) == k:
+            break
+            
+    return recs
 
 # --- Dataset ---
 class RetailRocketDataset(Dataset):
@@ -40,13 +56,13 @@ def main():
     N_RECS = 10
     
     # 1. Preparação
-    df_raw = pd.read_csv("data/raw/events.csv")
+    df_raw = pd.read_csv("shared/data/data_csv/raw/events.csv")
     preprocessor = DefaultEventPreprocessor()
     df = preprocessor.preprocess(df_raw)
     
     # Obtendo mapeamentos do preprocessor
     u_map, i_map = preprocessor.get_mappings(df)
-    item_to_idx = {v: k for k, v in i_map.items()} # Se necessário ajustar a lógica
+    item_to_idx = {v: k for k, v in i_map.items()} 
     
     n_users = df['user_idx'].nunique()
     n_items = df['item_idx'].nunique()
@@ -62,11 +78,25 @@ def main():
 
     for epoch in range(cfg['train']['epochs']):
         model.train()
+        total_loss = 0.0
+        
         for u, i, w in loader:
             optimizer.zero_grad()
-            loss = criterion(model(u, i), w)
+            predictions = model(u, i)
+            loss = criterion(predictions, w)
             loss.backward()
             optimizer.step()
+            
+            total_loss += loss.item()
+        
+        # Calcula a média da perda nesta época
+        avg_loss = total_loss / len(loader)
+        
+        # Print de verificação no console
+        print(f"Época [{epoch+1}/{cfg['train']['epochs']}] - Loss: {avg_loss:.4f}")
+        
+        # (Opcional) Log da perda no MLflow para monitoramento gráfico
+        mlflow.log_metric("train.loss", avg_loss, step=epoch)
     
     # 4. Avaliação e MLflow
     with mlflow.start_run(run_name="Neural-NeuMF-MLP"):
@@ -81,7 +111,7 @@ def main():
             recommend_fn=recommend_wrapper_mlp_fast,
             test_users=test_users,
             gt_dict=gt_dict,
-            n_items_total=n_items,
+            n_items_total= len(item_to_idx),
             k=N_RECS,
             model=model,
             idx_to_item=i_map,
