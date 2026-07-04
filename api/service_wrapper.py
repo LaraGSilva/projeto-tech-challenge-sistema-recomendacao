@@ -6,7 +6,6 @@ from shared.ml.model_factory import ModelFactory
 
 class RecommendationService:
     def __init__(self, model_path: str, mappings_path: str):
-        # Carrega configs para saber os hiperparâmetros (ex: mf_dim)
         self.cfg = load_config()
 
         data = np.load(mappings_path, allow_pickle=True).item()
@@ -19,9 +18,10 @@ class RecommendationService:
             "neumf_light", 
             n_users=len(self.user_to_idx), 
             n_items=len(self.item_to_idx),
-            mf_dim=self.cfg['model']['mf_dim'] # <-- Uso do parâmetro
+            mf_dim=self.cfg['model']['mf_dim'],
+            mlp_dim=self.cfg['model']['mlp_dim']
         )
-        self.model.load_state_dict(torch.load(model_path))
+        self.model.load_state_dict(torch.load(model_path, map_location="cpu"))
         self.model.eval()
 
     def get_recommendations(self, visitorid: int, k: int) -> list:

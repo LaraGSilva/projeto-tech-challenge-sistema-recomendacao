@@ -3,20 +3,29 @@ import torch.nn as nn
 import numpy as np
 import pandas as pd
 import yaml
-from torch.utils.data import Dataset, DataLoader
 import mlflow
+import mlflow.pytorch
+from torch.utils.data import Dataset, DataLoader
 
 # Importações da camada compartilhada
 from shared.ml.model_factory import ModelFactory
 from shared.ml.evaluate_metrics import avaliar_sistema_recomendacao
 from shared.data.preprocessing import DefaultEventPreprocessor
+from shared.utils.config import load_config
 
+# --- Wrapper para a função de recomendação ---
+def recommend_wrapper_mlp_fast(user_idx, model, k, item_to_idx, idx_to_item, n_items_total):
+    """Transforma a predição do modelo em uma lista de recomendações."""
+    model.eval()
+    with torch.no_grad():
+        u_t = torch.full((n_items_total,), user_idx, dtype=torch.long)
+        i_t = torch.arange(n_items_total, dtype=torch.long)
+        scores = model(u_t, i_t).numpy()
+        
+    top_indices = np.argsort(scores)[::-1][:k]
+    return [idx_to_item[idx] for idx in top_indices]
 
-# Carrega a configuração global
-def load_config(config_path="configs/model_params.yaml"):
-    with open(config_path, "r") as f:
-        return yaml.safe_load(f)
-
+# --- Dataset ---
 class RetailRocketDataset(Dataset):
     def __init__(self, df):
         self.users = torch.from_numpy(df['user_idx'].values).long()
@@ -25,30 +34,27 @@ class RetailRocketDataset(Dataset):
     def __len__(self): return len(self.users)
     def __getitem__(self, idx): return self.users[idx], self.items[idx], self.weights[idx]
 
-
 def main():
-
-    # 0. Carregar configurações
+    # 0. Configurações
     cfg = load_config()
+    N_RECS = 10
     
-    # 1. Preparação (usando Strategy de Preprocessing)
+    # 1. Preparação
     df_raw = pd.read_csv("data/raw/events.csv")
     preprocessor = DefaultEventPreprocessor()
     df = preprocessor.preprocess(df_raw)
     
-    # Lógica de mapeamento (pode ser movida para shared/data no futuro)
+    # Obtendo mapeamentos do preprocessor
+    u_map, i_map = preprocessor.get_mappings(df)
+    item_to_idx = {v: k for k, v in i_map.items()} # Se necessário ajustar a lógica
+    
     n_users = df['user_idx'].nunique()
     n_items = df['item_idx'].nunique()
     
-   # 2. Criação do Modelo via Factory usando params do YAML
-    model = ModelFactory.get_model(
-        "neumf_light", 
-        n_users=n_users, 
-        n_items=n_items,
-        mf_dim=cfg['model']['mf_dim']
-    )
+    # 2. Modelo
+    model = ModelFactory.get_model("neumf_light", n_users=n_users, n_items=n_items, **cfg['model'])
     
-    # 3. Treinamento usando params do YAML
+    # 3. Treino
     dataset = RetailRocketDataset(df)
     loader = DataLoader(dataset, batch_size=cfg['train']['batch_size'], shuffle=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg['train']['learning_rate'])
@@ -62,74 +68,36 @@ def main():
             loss.backward()
             optimizer.step()
     
-    # 4. Avaliação (mantendo o uso do MLflow com os parâmetros lidos)
+    # 4. Avaliação e MLflow
     with mlflow.start_run(run_name="Neural-NeuMF-MLP"):
         mlflow.log_params(cfg['model'])
         mlflow.log_params(cfg['train'])
         
-        gt_dict = df.groupby('visitorid')['itemid'].apply(list).to_dict()
-        lista_usuarios_teste = df['visitorid'].unique().tolist()
+        gt_dict = df.groupby('user_idx')['item_idx'].apply(list).to_dict()
+        test_users = df['user_idx'].unique().tolist()
 
-        print("Iniciando a avaliacao do sistema recomendacao")
-        resultados_experimentos = avaliar_sistema_recomendacao(
-            recommend_fn=recommend_wrapper_mlp_fast,
-            test_users=lista_usuarios_teste,     # Agora é uma lista iterável
-            gt_dict=gt_dict,
-            n_items_total=n_items,               # Aqui sim, o número total (int)
-            k=N_RECS,
-            model=model,
-            idx_to_item=i_map,                   # Passando o dicionário i_map
-            user_to_idx={v: k for k, v in u_map.items()}, # Invertendo u_map (ID -> Index)
-            item_to_idx=item_to_idx              # Passando o dicionário item_to_idx
-        )
-
-        # 2. Registra logs no MLflow
-        dataset_mlp = mlflow.data.from_pandas(
-            dataset, name="dataset_RetailRocket_Events")
-        mlflow.log_input(dataset_mlp, context="training/test")
-
-        mlflow.set_tags({
-            "model_type": "NeuMF_Neural_Collaborative_Filtering",
-            "framework": "pytorch",
-            "phase": "neural_model"
-        })
-
-        mlflow.log_params({
-            "model.mf_dim": 16,
-            "model.mlp_dim": 32,
-            "train.optimizer": "AdamW",
-            "train.epochs": 3,
-            "train.batch_size": 4096
-
-        })
-
+        print("Iniciando a avaliacao...")
         resultados = avaliar_sistema_recomendacao(
             recommend_fn=recommend_wrapper_mlp_fast,
-            test_users=list(u_map.values()),
+            test_users=test_users,
             gt_dict=gt_dict,
             n_items_total=n_items,
             k=N_RECS,
             model=model,
             idx_to_item=i_map,
-            user_to_idx={v: k for k, v in u_map.items()},
+            user_to_idx=u_map,
             item_to_idx=item_to_idx
         )
 
-        print(resultados)
-
         mlflow.log_metrics({
-            "eval.precision_at_10": resultados_experimentos[f"Precision@{N_RECS}"],
-            "eval.recall_at_10": resultados_experimentos[f"Recall@{N_RECS}"],
-            "eval.ndcg_at_10": resultados_experimentos[f"NDCG@{N_RECS}"],
-            "eval.catalog_coverage": resultados_experimentos["Coverage"]
+            f"eval.precision_at_{N_RECS}": resultados[f"Precision@{N_RECS}"],
+            f"eval.recall_at_{N_RECS}": resultados[f"Recall@{N_RECS}"],
+            f"eval.ndcg_at_{N_RECS}": resultados[f"NDCG@{N_RECS}"],
+            "eval.catalog_coverage": resultados["Coverage"]
         })
 
         mlflow.pytorch.log_model(model, "modelo-neumf")
-        print("Processo finalizado!")
-        
-    # 5. Persistência
-    torch.save(model.state_dict(), 'models/neumf_model.pth')
-    print("Treino finalizado e modelo salvo.")
+        print("Treino finalizado e logs enviados ao MLflow.")
 
 if __name__ == "__main__":
     main()

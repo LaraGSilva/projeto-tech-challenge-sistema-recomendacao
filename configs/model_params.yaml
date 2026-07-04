@@ -1,13 +1,12 @@
-# PyTorch
 model:
   mf_dim: 16
+  mlp_dim: 32
 train:
   batch_size: 4096
   learning_rate: 0.001
   epochs: 3
-
-
-# Exemplos para o KNN
-knn:
-  n_neighbors: 20
-  metric: "cosine"
+baselines:
+  svd:
+    n_components: 50
+  knn:
+    k_neighbors: 20

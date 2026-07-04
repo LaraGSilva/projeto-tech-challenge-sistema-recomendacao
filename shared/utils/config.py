@@ -2,11 +2,11 @@ import yaml
 from pathlib import Path
 
 def load_config(config_path="configs/model_params.yaml"):
-    # Garante que funciona mesmo se chamado de pastas diferentes
-    # Ajuste o caminho se necessário conforme o contexto de execução
+    """Carrega o YAML de configurações de forma segura."""
+    # O caminho é relativo à raiz do projeto quando executado via Docker ou CLI
     path = Path(config_path)
     if not path.exists():
-        # Fallback para caso esteja rodando de dentro de 'api/' ou 'training/'
+        # Fallback caso o script seja executado de subdiretórios
         path = Path("../configs/model_params.yaml")
         
     with open(path, "r") as f:
