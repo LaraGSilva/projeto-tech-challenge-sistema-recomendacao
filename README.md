@@ -8,6 +8,20 @@ Bem-vindo ao repositório do projeto **Tech Challenge**. Este sistema utiliza **
 
 O sistema é orquestrado via Docker, separando o ambiente de processamento (Aplicação) do ambiente de rastreamento (MLflow).
 
+```mermaid
+graph TD
+    subgraph "Ambiente Local (Desenvolvimento)"
+        A[Dados: events.csv] -->|Carrega| B[recommender_app]
+        B -->|Treino/Logs| C[MLflow Tracking Server]
+        C <--> D[(mlflow.db)]
+        C -->|Armazena Artefatos| E[Pasta mlruns]
+    end
+
+    subgraph "Docker Containers"
+        B
+        C
+    end
+```
 ---
 
 ## 📂 Organização do Repositório
@@ -32,7 +46,6 @@ Certifique-se de ter o Docker instalado e rode na raiz:
 
 ```bash
 docker-compose up -d --build
-
 ```
 
 ### 2. Executar o Treino
@@ -41,13 +54,11 @@ Para treinar o modelo e registrar os logs no MLflow automaticamente:
 
 ```bash
 docker-compose exec recommender_app python training/train.py
-
 ```
 
 ### 3. Visualizar Experimentos
 
 Abra o seu navegador e acesse: `http://localhost:5000` 🌐
-
 ---
 
 ## 🧪 Qualidade e Monitoramento
@@ -74,12 +85,10 @@ Para colocar o modelo em modo de servimento (API REST):
 2. Utilize o comando:
 ```bash
 mlflow models serve -m "models:/Neural-NeuMF-MLP/Production" --port 5001
-
 ```
 
 
 3. O endpoint estará disponível para requisições `POST` em `/invocations`.
-
 ---
 
 > *"Um bom modelo de recomendação não é apenas aquele que acerta, mas aquele que você consegue reproduzir e auditar."* 🧠✨

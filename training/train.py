@@ -1,3 +1,5 @@
+from mlflow.types import ColSpec, Schema
+
 from shared.utils.config import load_config
 from shared.data.preprocessing import DefaultEventPreprocessor
 from shared.ml.evaluate_metrics import avaliar_sistema_recomendacao
@@ -9,7 +11,7 @@ import pandas as pd
 import yaml
 import mlflow
 import mlflow.pytorch
-from mlflow.models import infer_signature
+from mlflow.models import ModelSignature, infer_signature
 from torch.utils.data import Dataset, DataLoader
 import os
 os.environ["GIT_PYTHON_REFRESH"] = "quiet"
@@ -17,7 +19,7 @@ os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 # Importações da camada compartilhada
 
 mlflow.set_experiment("retailrocket-recommender")
-mlflow.set_tracking_uri("http://recommender_mlflow:5000")
+# mlflow.set_tracking_uri("http://recommender_mlflow:5000")
 
 # --- Wrapper para a função de recomendação ---
 
@@ -154,14 +156,36 @@ def main():
 
         signature = infer_signature(input_example, output_example)
 
+        signature = ModelSignature(
+            inputs=Schema([ColSpec("long", "user_idx"), ColSpec("long", "item_idx")]),
+            outputs=Schema([ColSpec("double", "prediction")]))
+
+        model_name = "Neural-NeuMF-MLP"
         mlflow.pytorch.log_model(
             pytorch_model=model, 
-            artifact_path="Neural-NeuMF-MLP", 
+            artifact_path="model",
             signature=signature,
-            input_example=input_example, 
-            erialization_format="pt2"
+            registered_model_name=model_name,
+            input_example=input_example,
+            serialization_format="pickle"
         )
 
+        
+        model_uri = f"runs:/{mlflow.active_run().info.run_id}/model"
+        model_version = mlflow.register_model(model_uri, model_name)
+        
+        client = mlflow.tracking.MlflowClient()
+        client.set_registered_model_alias(
+            name=model_name, 
+            alias="Production", 
+            version=model_version.version)
+        
+        # Salva mapeamentos como artefato
+        mappings = {"user_to_idx": u_map, "item_to_idx": item_to_idx}
+        np.save("mappings.npy", mappings)
+        mlflow.log_artifact("mappings.npy")
+        
+        print(f"Modelo {model_name} v{model_version.version} movido para Production.")
         print("Treino finalizado e logs enviados ao MLflow.")
 
 if __name__ == "__main__":

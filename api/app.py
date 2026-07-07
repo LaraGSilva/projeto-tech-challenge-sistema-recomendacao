@@ -1,18 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 from api.service_wrapper import RecommendationService
+from api.schema import RecommendRequest, RecommendResponse 
 
 service = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global service
-    # O caminho dos modelos aqui deve ser o caminho dentro do container (/app/models/...)
-    service = RecommendationService(
-        model_type="neumf_light",
-        model_path="/app/models/neumf_model.pth",
-        mappings_path="/app/models/mappings.npy"
-    )
+    service = RecommendationService(model_name="Neural-NeuMF-MLP", stage="Production")
     yield
     service = None
 
@@ -22,4 +18,15 @@ app = FastAPI(lifespan=lifespan)
 def recommend(request: RecommendRequest):
     if not service:
         raise HTTPException(status_code=503, detail="Serviço indisponível")
-    return {"visitorid": request.visitorid, "recommendations": service.get_recommendations(request.visitorid, request.k)}
+    
+    recommendations = service.get_recommendations(request.visitorid, request.k)
+    
+    return {
+        "visitorid": request.visitorid, 
+        "recommendations": recommendations
+    }
+
+
+    # import mlflow
+    print(f"DEBUG: Tracking URI atual: {mlflow.get_tracking_uri()}")
+    # print(f"DEBUG: Tentando buscar modelo: {model_name}")
