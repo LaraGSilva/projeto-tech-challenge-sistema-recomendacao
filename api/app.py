@@ -8,7 +8,7 @@ service = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global service
-    service = RecommendationService(model_name="Neural-NeuMF-MLP", stage="Production")
+    service = RecommendationService(model_name="Neural-NeuMF-MLP", stage="@ Production")
     yield
     service = None
 

@@ -1,43 +1,35 @@
 services:
-  # 1. Serviço de MLflow para rastreamento de experimentos
-  mlflow:
-    image: ghcr.io/mlflow/mlflow:latest
-    container_name: recommender_mlflow
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./mlflow_server:/data  # Mapeia uma pasta local 'mlflow_data' para /data no container
-    environment:
-      - MLFLOW_SERVER_ALLOWED_HOSTS=*
-    command: >
-      mlflow server 
-      --backend-store-uri sqlite:////data/mlflow.db 
-      --default-artifact-root /data/mlruns 
-      --host 0.0.0.0 
-      --port 5000
-
-  # 2. Aplicação principal (API + Treino)
   recommender_app:
     build: .
     container_name: recommender_app
     ports:
       - "8000:8000"
+    mem_limit: 5g
     volumes:
-      # Monta o projeto inteiro para acesso ao código e aos modelos gerados
       - .:/app
+      - ./mlflow_data:/data
     environment:
-      - MLFLOW_TRACKING_URI=http://recommender_mlflow:5000
-      # PYTHONPATH=/app garante que o Python encontre os módulos na raiz
-      - PYTHONPATH=/app
-      # Caminhos dos artefatos lidos pelo service_wrapper e pelos scripts
-      - MODEL_PATH=/app/models/neumf_model.pth
-      - MAPPINGS_PATH=/app/models/mappings.npy
-    tty: true
-    stdin_open: true
-    # O comando abaixo mantém o container rodando para você executar comandos manuais,
-    # mas você pode trocar para: command: uvicorn api.app:app --host 0.0.0.0 --port 8000
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    depends_on:
+      - mlflow
     command: tail -f /dev/null
-    deploy:
-      resources:
-        limits:
-          memory: 4g
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow_server
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:////data/mlflow.db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/data/mlruns
+    volumes:
+      - ./mlflow_data:/data
+
+    command: >
+      mlflow server 
+      --backend-store-uri sqlite:////data/mlflow.db 
+      --default-artifact-root /data/mlruns 
+      --host 0.0.0.0 
+      --serve-artifacts
+      --allowed-hosts "*"
+      --serve-artifacts
