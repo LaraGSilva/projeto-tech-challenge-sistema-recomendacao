@@ -8,7 +8,7 @@ service = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global service
-    service = RecommendationService(model_name="Neural-NeuMF-MLP", stage="@ Production")
+    service = RecommendationService(model_name="Neural-NeuMF-MLP",alias="production")
     yield
     service = None
 
@@ -25,8 +25,3 @@ def recommend(request: RecommendRequest):
         "visitorid": request.visitorid, 
         "recommendations": recommendations
     }
-
-
-    # import mlflow
-    print(f"DEBUG: Tracking URI atual: {mlflow.get_tracking_uri()}")
-    # print(f"DEBUG: Tentando buscar modelo: {model_name}")
