@@ -1,0 +1,8 @@
+paths:
+  raw_data: "data/raw/events.csv"
+  features_output: "data/features/"
+  models_output: "models/"
+
+preprocessing:
+  min_interactions: 5
+  seed: 42

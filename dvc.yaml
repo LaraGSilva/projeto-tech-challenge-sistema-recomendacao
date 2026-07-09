@@ -1,0 +1,38 @@
+stages:
+  # ==========================================
+  # STAGE 1: Geração de Features
+  # ==========================================
+  build_features:
+    cmd: python scripts/build_features_local.py
+    deps:
+      - scripts/build_features_local.py
+      - data/raw/events.csv
+    outs:
+      - data/features/user_item_matrix.npz
+      - data/features/mappings.pkl
+
+  # ==========================================
+  # STAGE 2: Treinamento dos Baselines (Scikit-Learn)
+  # ==========================================
+  train_baselines:
+    cmd: python src/recommender/models/train_baselines.py
+    deps:
+      - src/recommender/models/train_baselines.py
+      - src/recommender/evaluation/evaluate.py
+      - data/features/user_item_matrix.npz
+      - data/features/mappings.pkl
+    outs:
+      - models/baselines/
+
+  # ==========================================
+  # STAGE 3: Treinamento da Rede Neural (PyTorch)
+  # ==========================================
+  train_neural:
+    cmd: python -c "from src.recommender.models.train_neural import main; main()"
+    deps:
+      - src/recommender/models/train_neural.py
+      - src/recommender/evaluation/evaluate.py
+      - data/raw/events.csv
+      - data/raw/item_properties_part1.csv
+      - data/raw/item_properties_part2.csv
+      - configs/model_params.yaml

@@ -1,0 +1,4 @@
+[core]
+    remote = dvc-storage-demo
+['remote "dvc-storage-demo"']
+    url =   /Users/lara-/dvc-storage-demo
