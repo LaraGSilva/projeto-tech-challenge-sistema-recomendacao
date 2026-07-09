@@ -16,5 +16,5 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build and Run Training
         run: |
-          docker-compose build recommender_app
-          docker-compose run recommender_app python training/train_neural.py
+          docker compose build recommender_app
+          docker compose run recommender_app python training/train_neural.py
