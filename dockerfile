@@ -57,7 +57,7 @@ COPY pyproject.toml uv.lock ./
 # Instala SOMENTE as dependências do projeto (ignora dev)
 # O --frozen garante que ele instale exatamente o que está no lock
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen
 
 # Copia o código fonte para dentro do builder
 COPY . .
