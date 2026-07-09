@@ -6,7 +6,8 @@ train:
   learning_rate: 0.001
   epochs: 3
 baselines:
-  svd:
-    n_components: 50
+  n_recs: 10  # Adicione esta linha
   knn:
     k_neighbors: 20
+  svd:
+    n_components: 50

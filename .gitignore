@@ -1,6 +1,6 @@
 .venv
-data/raw/
-data/raw/
+shared/data/data_csv/
+data/
 data/processed/
 models/*.pt
 __pycache__/

@@ -1,302 +1,134 @@
 import pickle
-from pathlib import Path
-import os
 import sys
+import os
+from pathlib import Path
+from typing import Dict, Any, List, Tuple, Callable
+
 import mlflow
-from mlflow.models import infer_signature
-import mlflow.sklearn
 import numpy as np
 import pandas as pd
-from scipy.sparse import csr_matrix, load_npz
-from sklearn.decomposition import TruncatedSVD
-from sklearn.neighbors import NearestNeighbors
+from scipy.sparse import load_npz, csr_matrix
+
+# Ajuste do path para importar módulos da arquitetura
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+
 from shared.utils.config import load_config
-
-# ── Importando as métricas padronizadas do projeto ────────────────────────────
-sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
-
 from shared.ml.evaluate_metrics import avaliar_sistema_recomendacao
+from shared.ml.model_factory import ModelFactory
 
-# ── configuração ──────────────────────────────────────────────────────────────
-
-MATRIX_PATH = Path("data/features/user_item_matrix.npz")
-MAPPINGS_PATH = Path("data/features/mappings.pkl")
-MODELS_DIR = Path("models/baselines")
-N_RECS = 10
-SEED = 42
-
-# Mude de 'http://localhost:5000' para a variável de ambiente
-# 
-tracking_uri = "http://recommender_mlflow:5000" 
-mlflow.set_tracking_uri(tracking_uri)
+os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 mlflow.set_experiment("retailrocket-recommender")
 
-# ── carregamento dos dados ────────────────────────────────────────────────────
+# ── Configurações ─────────────────────────────────────────────────────────────
+MATRIX_PATH: Path = Path("data/features/user_item_matrix.npz")
+MAPPINGS_PATH: Path = Path("data/features/mappings.pkl")
+SEED: int = 42
 
+def load_artifacts() -> Tuple[csr_matrix, Dict[str, Any]]:
+    """Carrega a matriz esparsa e os mapeamentos do projeto.
 
-def load_artifacts() -> tuple[csr_matrix, dict]:
-    matrix = load_npz(MATRIX_PATH)
+    Returns:
+        Tuple[csr_matrix, Dict[str, Any]]: Uma tupla contendo a matriz de interações 
+        (csr_matrix) e o dicionário de mapeamentos.
+    """
+    matrix: csr_matrix = load_npz(MATRIX_PATH)
     with open(MAPPINGS_PATH, "rb") as f:
-        mappings = pickle.load(f)
+        mappings: Dict[str, Any] = pickle.load(f)
     return matrix, mappings
 
-# ── preparação do ground truth para o avaliador ───────────────────────────────
-def _build_ground_truth(matrix: csr_matrix, mappings: dict, test_users_idx: list[int]) -> dict:
-    """Reconstrói o gt_dict (user_id -> list[item_id]) a partir da matriz esparsa."""
-    gt_dict = {}
-    idx_to_user = mappings["idx_to_user"]
-    idx_to_item = mappings["idx_to_item"]
+def _build_ground_truth(
+    matrix: csr_matrix, 
+    mappings: Dict[str, Any], 
+    test_users_idx: List[int]
+) -> Dict[int, List[int]]:
+    """Reconstrói o dicionário de ground truth para avaliação.
+
+    Args:
+        matrix (csr_matrix): Matriz de interação usuário-item.
+        mappings (Dict[str, Any]): Dicionário contendo 'idx_to_user' e 'idx_to_item'.
+        test_users_idx (List[int]): Lista de índices de usuários para teste.
+
+    Returns:
+        Dict[int, List[int]]: Dicionário onde chaves são IDs originais dos usuários 
+        e valores são listas de IDs originais dos itens relevantes.
+    """
+    gt_dict: Dict[int, List[int]] = {}
+    idx_to_user: Dict[int, int] = mappings["idx_to_user"]
+    idx_to_item: Dict[int, int] = mappings["idx_to_item"]
 
     for u_idx in test_users_idx:
-        # Pega as colunas com valor > 0 na linha do usuário
-        relevant_idx = matrix[u_idx].nonzero()[1]
+        relevant_idx: np.ndarray = matrix[u_idx].nonzero()[1]
         if len(relevant_idx) > 0:
-            original_user_id = idx_to_user[u_idx]
-            original_items = [idx_to_item[i] for i in relevant_idx]
+            original_user_id: int = idx_to_user[u_idx]
+            original_items: List[int] = [idx_to_item[i] for i in relevant_idx]
             gt_dict[original_user_id] = original_items
-
     return gt_dict
 
-# ── baseline 1: popularity ────────────────────────────────────────────────────
+def run_baseline_training() -> None:
+    """Orquestra o treinamento e avaliação dos modelos baselines.
 
-def train_popularity(
-    matrix: csr_matrix,
-    mappings: dict,
-    test_users_original: list[int],
-    gt_dict: dict,
-    n_items_total: int
-) -> None:
-    
-    df_dataset = pd.DataFrame([gt_dict]) # Ou pd.DataFrame(gt_dict) se o dict for tabular
-    dataset = mlflow.data.from_pandas(df_dataset, name="dataset_RetailRocket_Events_and_Properties")
-    
-    with mlflow.start_run(run_name="popularity"):
-        
-        mlflow.log_input(dataset, context="training/test")      
+    Carrega dados, configura modelos, realiza o treino/inferência, avalia o sistema
+    e registra os resultados e parâmetros no MLflow.
+    """
+    print("Iniciando treinamento de baselines...")
 
-        mlflow.log_param("model_type", "popularity")
-        mlflow.log_param("n_recommendations", N_RECS)
-
-        item_scores = np.asarray(matrix.sum(axis=0)).flatten()
-        top_items_idx = np.argsort(item_scores)[::-1][:N_RECS].tolist()
-
-        # Converte a recomendação de índices para IDs originais
-        top_items_original = [mappings["idx_to_item"][i]
-                              for i in top_items_idx]
-
-        # Wrapper adaptado para o formato da função de avaliação
-        def recommend_fn(user_id, k, **kwargs):
-            return top_items_original[:k]
-
-        metrics = avaliar_sistema_recomendacao(
-            recommend_fn=recommend_fn,
-            test_users=test_users_original,
-            gt_dict=gt_dict,
-            n_items_total=n_items_total,
-            k=N_RECS
-        )
-
-        mlflow.log_metrics({
-            "eval.precision_at_10": metrics[f"Precision@{N_RECS}"],
-            "eval.recall_at_10": metrics[f"Recall@{N_RECS}"],
-            "eval.ndcg_at_10": metrics[f"NDCG@{N_RECS}"],
-            "eval.catalog_coverage": metrics["Coverage"]
-        })
-
-        MODELS_DIR.mkdir(parents=True, exist_ok=True)
-        model_path = MODELS_DIR / "popularity_top_items.npy"
-        np.save(model_path, top_items_idx)
-        mlflow.log_artifact(str(model_path))
-        #mlflow.pyfunc.log_model(,'popularity ranking')
-        print(f"[popularity] {metrics}")
-
-# ── baseline 2: knn user-based ────────────────────────────────────────────────
-
-def train_knn(
-    matrix: csr_matrix,
-    mappings: dict,
-    test_users_original: list[int],
-    gt_dict: dict,
-    n_items_total: int,
-    k_neighbors: int = 20,
-) -> None:
-    
-    with mlflow.start_run(run_name="knn_user_cf"):
-        df_dataset = pd.DataFrame([gt_dict]) 
-        dataset = mlflow.data.from_pandas(df_dataset, name="dataset_RetailRocket_Events_and_Properties")
-    
-        mlflow.log_input(dataset, context="training/test")  
-        mlflow.log_param("model_type", "knn_user_cf")
-        mlflow.log_param("k_neighbors", k_neighbors)
-        mlflow.log_param("metric", "cosine")
-        mlflow.log_param("n_recommendations", N_RECS)
-
-        knn = NearestNeighbors(
-            metric="cosine", algorithm="brute", n_neighbors=k_neighbors + 1)
-        knn.fit(matrix)
-
-        user_to_idx = mappings["user_to_idx"]
-        idx_to_item = mappings["idx_to_item"]
-
-        def recommend_fn(user_id, k, **kwargs):
-            if user_id not in user_to_idx:
-                return []
-
-            user_idx = user_to_idx[user_id]
-            distances, neighbors = knn.kneighbors(matrix[user_idx])
-            neighbors = neighbors[0][1:]
-            similarities = 1 - distances[0][1:]
-
-            neighbor_matrix = matrix[neighbors].toarray()
-            scores = similarities @ neighbor_matrix
-
-            already_seen = matrix[user_idx].nonzero()[1]
-            scores[already_seen] = -np.inf
-            top_idx = np.argsort(scores)[::-1][:k].tolist()
-
-            return [idx_to_item[i] for i in top_idx]
-
-        metrics = avaliar_sistema_recomendacao(
-            recommend_fn=recommend_fn,
-            test_users=test_users_original,
-            gt_dict=gt_dict,
-            n_items_total=n_items_total,
-            k=N_RECS
-        )
-
-        mlflow.log_metrics({
-            "eval.precision_at_10": metrics[f"Precision@{N_RECS}"],
-            "eval.recall_at_10": metrics[f"Recall@{N_RECS}"],
-            "eval.ndcg_at_10": metrics[f"NDCG@{N_RECS}"],
-            "eval.catalog_coverage": metrics["Coverage"]
-        })
-
-        MODELS_DIR.mkdir(parents=True, exist_ok=True)
-        model_path = MODELS_DIR / "knn_model.pkl"
-        with open(model_path, "wb") as f:
-            pickle.dump(knn, f)
-        mlflow.log_artifact(str(model_path))
-
-    # # 4. Assinatura Corrigida (Inputs e Outputs condizentes com a realidade)
-    # sample_user = np.array([12345], dtype=np.int64)
-    # # Output simulado contendo uma lista de 10 IDs reais de itens do catálogo
-    # sample_output = np.array(list(idx_to_item.values())[:N_RECS], dtype=np.int64)
-    
-    # signature = infer_signature(
-    #     model_input={"visitor_id": sample_user},
-    #     model_output=sample_output
-    # )
-
-    # mlflow.sklearn.log_model(
-    #         sk_model=recommend_fn,
-    #         artifact_path="modelo-knn-retailrocket",
-    #         signature=signature,
-    #         registered_model_name="knn--recommendation")
-
-    print(f"[knn] {metrics}")
-
-# ── baseline 3: svd matrix factorization ─────────────────────────────────────
-
-
-def train_svd(
-    matrix: csr_matrix,
-    mappings: dict,
-    test_users_original: list[int],
-    gt_dict: dict,
-    n_items_total: int,
-    n_components: int = 50,
-) -> None:
-    
-    with mlflow.start_run(run_name="svd"):
-        df_dataset = pd.DataFrame([gt_dict]) # Ou pd.DataFrame(gt_dict) se o dict for tabular
-        dataset = mlflow.data.from_pandas(df_dataset, name="dataset_RetailRocket_Events_and_Properties")
-      
-        mlflow.log_input(dataset, context="training/test")
-        mlflow.log_param("model_type", "svd")
-        mlflow.log_param("n_components", n_components)
-        mlflow.log_param("n_recommendations", N_RECS)
-        mlflow.log_param("seed", SEED)
-
-        svd = TruncatedSVD(n_components=n_components, random_state=SEED)
-        user_factors = svd.fit_transform(matrix)    # (n_users, n_components)
-        item_factors = svd.components_.T            # (n_items, n_components)
-
-        user_to_idx = mappings["user_to_idx"]
-        idx_to_item = mappings["idx_to_item"]
-
-        def recommend_fn(user_id, k, **kwargs):
-            if user_id not in user_to_idx:
-                return []
-
-            user_idx = user_to_idx[user_id]
-            scores = user_factors[user_idx] @ item_factors.T
-            already_seen = matrix[user_idx].nonzero()[1]
-            scores[already_seen] = -np.inf
-
-            top_idx = np.argsort(scores)[::-1][:k].tolist()
-            return [idx_to_item[i] for i in top_idx]
-
-        metrics = avaliar_sistema_recomendacao(
-            recommend_fn=recommend_fn,
-            test_users=test_users_original,
-            gt_dict=gt_dict,
-            n_items_total=n_items_total,
-            k=N_RECS
-        )
-
-        mlflow.log_metrics({
-            "eval.precision_at_10": metrics[f"Precision@{N_RECS}"],
-            "eval.recall_at_10": metrics[f"Recall@{N_RECS}"],
-            "eval.ndcg_at_10": metrics[f"NDCG@{N_RECS}"],
-            "eval.catalog_coverage": metrics["Coverage"]
-        })
-
-        MODELS_DIR.mkdir(parents=True, exist_ok=True)
-        np.save(MODELS_DIR / "svd_user_factors.npy", user_factors)
-        np.save(MODELS_DIR / "svd_item_factors.npy", item_factors)
-        # mlflow.sklearn.log_model(svd, "svd_model")
-
-        print(f"[svd] {metrics}")
-
-# ── entrypoint ────────────────────────────────────────────────────────────────
-
-
-def main() -> None:
-    cfg = load_config() # Carrega tudo
+    cfg: Dict[str, Any] = load_config()
     matrix, mappings = load_artifacts()
-
-    n_users = matrix.shape[0]
-    n_items_total = matrix.shape[1]
-
-    rng = np.random.default_rng(SEED)
-    test_users_idx = rng.choice(n_users, size=min(
-        5_000, n_users), replace=False).tolist()
-
-    # Prepara dicionário padrão para a função avaliar_sistema_recomendacao
-    gt_dict = _build_ground_truth(matrix, mappings, test_users_idx)
-    test_users_original = list(gt_dict.keys())
-
-    train_popularity(matrix, mappings, test_users_original,
-                     gt_dict, n_items_total)
+    n_users, n_items = matrix.shape
     
-    train_knn(
-        matrix, 
-        mappings,
-        test_users_original,
-        gt_dict, 
-        n_items_total, 
-        k_neighbors=cfg['baselines']['knn']['k_neighbors'])
+    # 1. Seleção de usuários para teste
+    rng: np.random.Generator = np.random.default_rng(SEED)
+    test_users_idx: List[int] = rng.choice(n_users, size=min(5_000, n_users), replace=False).tolist()
+    gt_dict: Dict[int, List[int]] = _build_ground_truth(matrix, mappings, test_users_idx)
+    test_users: List[int] = list(gt_dict.keys())
 
+    # 2. Configurações dos modelos
+    model_configs: Dict[str, Dict[str, Any]] = {
+        "popularity": {"config": {"matrix": matrix, "mappings": mappings}},
+        "knn": {
+            "config": {
+                "matrix": matrix, 
+                "mappings": mappings, 
+                "k": cfg['baselines']['knn']['k_neighbors']
+            }
+        },
+        "svd": {
+            "config": {
+                "matrix": matrix, 
+                "mappings": mappings, 
+                "n_components": cfg['baselines']['svd']['n_components']
+            }
+        }
+    }
 
-    train_svd(
-        matrix, 
-        mappings, 
-        test_users_original, 
-        gt_dict, 
-        n_items_total,
-        n_components=cfg['baselines']['svd']['n_components'] 
-    )
+    df_raw: pd.DataFrame = pd.read_csv("shared/data/data_csv/raw/events.csv")
 
+    # 3. Loop de Treino e Avaliação via Factory
+    for name, params in model_configs.items():
+        with mlflow.start_run(run_name=f"baseline_{name}"):
+            dataset_mlflow = mlflow.data.from_pandas(
+                df_raw, name="dataset_RetailRocket_Events_and_Properties"
+            )
+            mlflow.log_input(dataset_mlflow, context="training")
+
+            # Instancia via Factory
+            model = ModelFactory.create_model(name, params["config"], mappings)
+            
+            # Avaliação padronizada
+            metrics: Dict[str, float] = avaliar_sistema_recomendacao(
+                recommend_fn=model.recommend,
+                test_users=test_users,
+                gt_dict=gt_dict,
+                n_items_total=n_items,
+                k=cfg['baselines'].get('n_recs', 10)
+            )
+            
+            # Logging no MLflow
+            if name != "popularity":
+                mlflow.log_params(params["config"])
+            mlflow.log_metrics({f"eval.{k.lower()}": v for k, v in metrics.items()})
+            
+            print(f"Baseline {name} concluído. Métricas: {metrics}")
 
 if __name__ == "__main__":
-    main()
+    run_baseline_training()
