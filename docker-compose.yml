@@ -1,6 +1,8 @@
 services:
   recommender_app:
-    build: .
+    build:
+      context: .
+      target: builder
     container_name: recommender_app
     ports:
       - "8000:8000"
@@ -12,7 +14,7 @@ services:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
     depends_on:
       - mlflow
-    command: tail -f /dev/null
+    command: uvicorn main:app --host 0.0.0.0
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:latest
@@ -26,10 +28,10 @@ services:
       - ./mlflow_data:/data
 
     command: >
-      mlflow server 
-      --backend-store-uri sqlite:////data/mlflow.db 
-      --default-artifact-root /data/mlruns 
-      --host 0.0.0.0 
+      mlflow server
+      --backend-store-uri sqlite:////data/mlflow.db
+      --default-artifact-root /data/mlruns
+      --host 0.0.0.0
       --serve-artifacts
       --allowed-hosts "*"
       --serve-artifacts

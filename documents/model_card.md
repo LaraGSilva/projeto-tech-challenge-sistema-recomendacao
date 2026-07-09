@@ -102,4 +102,3 @@ A EDA está contida no diretório `notebooks/`. Recomenda-se executar o `eda.ipy
 * `Precision@10`: [Inserir valor]
 * `Recall@10`: [Inserir valor]
 * `NDCG@10`: [Inserir valor]
-

@@ -1,8 +1,10 @@
+from typing import Any, Dict, List
+
 import numpy as np
-from typing import Dict, List, Any, Optional
 from scipy.sparse import csr_matrix
-from sklearn.neighbors import NearestNeighbors
 from sklearn.decomposition import TruncatedSVD
+from sklearn.neighbors import NearestNeighbors
+
 
 class PopularityModel:
     """Baseline baseado na popularidade global dos itens.
@@ -13,7 +15,9 @@ class PopularityModel:
         top_items_idx (np.ndarray): Índices dos itens ordenados por popularidade.
     """
 
-    def __init__(self, matrix: csr_matrix, mappings: Dict[str, Any], **kwargs: Any) -> None:
+    def __init__(
+        self, matrix: csr_matrix, mappings: Dict[str, Any], **kwargs: Any
+    ) -> None:
         """Inicializa o modelo de popularidade.
 
         Args:
@@ -42,7 +46,9 @@ class PopularityModel:
 class KNNModel:
     """Baseline baseado em KNN User-to-User."""
 
-    def __init__(self, matrix: csr_matrix, mappings: Dict[str, Any], k: int = 20, **kwargs: Any) -> None:
+    def __init__(
+        self, matrix: csr_matrix, mappings: Dict[str, Any], k: int = 20, **kwargs: Any
+    ) -> None:
         """Inicializa e treina o modelo KNN.
 
         Args:
@@ -53,8 +59,10 @@ class KNNModel:
         self.matrix: csr_matrix = matrix
         self.user_to_idx: Dict[Any, int] = mappings["user_to_idx"]
         self.idx_to_item: Dict[int, Any] = mappings["idx_to_item"]
-        
-        self.knn = NearestNeighbors(metric="cosine", algorithm="brute", n_neighbors=k + 1)
+
+        self.knn = NearestNeighbors(
+            metric="cosine", algorithm="brute", n_neighbors=k + 1
+        )
         self.knn.fit(matrix)
 
     def recommend(self, user_id: Any, k: int, *args: Any, **kwargs: Any) -> List[Any]:
@@ -72,7 +80,7 @@ class KNNModel:
 
         user_idx: int = self.user_to_idx[user_id]
         distances, neighbors = self.knn.kneighbors(self.matrix[user_idx])
-        
+
         neighbors = neighbors[0][1:]
         similarities = 1 - distances[0][1:]
 
@@ -89,7 +97,13 @@ class KNNModel:
 class SVDModel:
     """Baseline baseado em Fatoração de Matrizes (SVD)."""
 
-    def __init__(self, matrix: csr_matrix, mappings: Dict[str, Any], n_components: int = 50, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        matrix: csr_matrix,
+        mappings: Dict[str, Any],
+        n_components: int = 50,
+        **kwargs: Any,
+    ) -> None:
         """Inicializa e treina o modelo SVD.
 
         Args:
@@ -100,7 +114,7 @@ class SVDModel:
         self.matrix: csr_matrix = matrix
         self.user_to_idx: Dict[Any, int] = mappings["user_to_idx"]
         self.idx_to_item: Dict[int, Any] = mappings["idx_to_item"]
-        
+
         self.svd = TruncatedSVD(n_components=n_components, random_state=42)
         self.user_factors: np.ndarray = self.svd.fit_transform(matrix)
         self.item_factors: np.ndarray = self.svd.components_.T
@@ -120,7 +134,7 @@ class SVDModel:
 
         user_idx: int = self.user_to_idx[user_id]
         scores: np.ndarray = self.user_factors[user_idx] @ self.item_factors.T
-        
+
         already_seen = self.matrix[user_idx].nonzero()[1]
         scores[already_seen] = -np.inf
 

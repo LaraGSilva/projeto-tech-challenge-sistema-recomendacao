@@ -1,16 +1,15 @@
-import os
 import logging
-from typing import List, Dict, Any, Tuple
+import os
+from typing import Any, Dict, List, Tuple
 
 import mlflow
 import mlflow.pytorch
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
-import yaml
-from mlflow.models import ModelSignature, infer_signature
+from mlflow.models import ModelSignature
 from mlflow.types import ColSpec, Schema
+from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
 from shared.data.preprocessing import DefaultEventPreprocessor
@@ -22,7 +21,7 @@ from shared.utils.config import load_config
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler()]
+    handlers=[logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
 
@@ -30,6 +29,7 @@ logger = logging.getLogger(__name__)
 # Configuração de ambiente
 os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 mlflow.set_experiment("retailrocket-recommender")
+
 
 def recommend_wrapper_mlp_fast(
     user_idx: int, k: int, n_items_total: int, model: nn.Module, **kwargs: Any
@@ -47,7 +47,7 @@ def recommend_wrapper_mlp_fast(
         List[int]: Lista de IDs dos itens recomendados.
     """
     model.eval()
-    idx_to_item: Dict[int, int] = kwargs.get('idx_to_item')
+    idx_to_item: Dict[int, int] = kwargs.get("idx_to_item")
 
     if idx_to_item is None:
         raise ValueError("O argumento 'idx_to_item' é obrigatório no kwargs.")
@@ -67,14 +67,15 @@ def recommend_wrapper_mlp_fast(
             break
     return recs
 
+
 class RetailRocketDataset(Dataset):
     """Dataset para carregamento dos dados de interação RetailRocket."""
 
     def __init__(self, df: pd.DataFrame) -> None:
         """Inicializa o dataset com tensores PyTorch."""
-        self.users = torch.from_numpy(df['user_idx'].values).long()
-        self.items = torch.from_numpy(df['item_idx'].values).long()
-        self.weights = torch.from_numpy(df['weight'].values).float()
+        self.users = torch.from_numpy(df["user_idx"].values).long()
+        self.items = torch.from_numpy(df["item_idx"].values).long()
+        self.weights = torch.from_numpy(df["weight"].values).float()
 
     def __len__(self) -> int:
         """Retorna o número de amostras."""
@@ -84,11 +85,12 @@ class RetailRocketDataset(Dataset):
         """Retorna tupla (user, item, weight) para um dado índice."""
         return self.users[idx], self.items[idx], self.weights[idx]
 
+
 def main() -> None:
     """Executa o pipeline de treino, avaliação e registro do modelo no MLflow."""
     logger.info("Iniciando pipeline de treinamento...")
     cfg: Dict[str, Any] = load_config()
-    N_RECS = 10
+    n_recs = 10
     os.makedirs("artifacts", exist_ok=True)
 
     # 1. Preparação dos dados
@@ -103,20 +105,21 @@ def main() -> None:
 
     # 2. Instanciação do Modelo
     model = ModelFactory.create_model(
-        "neumf_light",
-        config={**cfg["model"], "n_users": n_users, "n_items": n_items}
+        "neumf_light", config={**cfg["model"], "n_users": n_users, "n_items": n_items}
     )
 
     # 3. Treinamento
     train_dataset = RetailRocketDataset(df)
-    loader = DataLoader(train_dataset, batch_size=cfg["train"]["batch_size"], shuffle=True)
+    loader = DataLoader(
+        train_dataset, batch_size=cfg["train"]["batch_size"], shuffle=True
+    )
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg["train"]["learning_rate"])
     criterion = nn.MSELoss()
 
     with mlflow.start_run(run_name="Train-Neural-NeuMF-MLP"):
         # Registro de artefatos iniciais
         mlflow.log_params({**cfg["model"], **cfg["train"]})
-        
+
         for epoch in range(cfg["train"]["epochs"]):
             model.train()
             total_loss = 0.0
@@ -127,10 +130,12 @@ def main() -> None:
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item()
-            
+
             avg_loss = total_loss / len(loader)
             mlflow.log_metric("train.loss", avg_loss, step=epoch)
-            logger.info(f"Época [{epoch + 1}/{cfg['train']['epochs']}] Loss = {avg_loss:.6f}")
+            logger.info(
+                f"Época [{epoch + 1}/{cfg['train']['epochs']}] Loss = {avg_loss:.6f}"
+            )
 
         # 4. Avaliação
         gt_dict = df.groupby("user_idx")["item_idx"].apply(list).to_dict()
@@ -139,29 +144,34 @@ def main() -> None:
             test_users=df["user_idx"].unique().tolist(),
             gt_dict=gt_dict,
             n_items_total=len(item_to_idx),
-            k=N_RECS,
+            k=n_recs,
             model=model,
             idx_to_item=i_map,
             user_to_idx=u_map,
-            item_to_idx=item_to_idx
+            item_to_idx=item_to_idx,
         )
-        mlflow.log_metrics({f"eval.precision_at_{N_RECS}": resultados[f"Precision@{N_RECS}"], 
-                           "eval.catalog_coverage": resultados["Coverage"]})
+        mlflow.log_metrics(
+            {
+                f"eval.precision_at_{n_recs}": resultados[f"Precision@{n_recs}"],
+                "eval.catalog_coverage": resultados["Coverage"],
+            }
+        )
 
         # 5. Registro do Modelo
         signature = ModelSignature(
             inputs=Schema([ColSpec("long", "user_idx"), ColSpec("long", "item_idx")]),
-            outputs=Schema([ColSpec("double", "prediction")])
+            outputs=Schema([ColSpec("double", "prediction")]),
         )
-        
+
         mlflow.pytorch.log_model(
             pytorch_model=model,
             artifact_path="model",
             signature=signature,
-            registered_model_name="Neural-NeuMF-MLP"
+            registered_model_name="Neural-NeuMF-MLP",
         )
-        
+
         logger.info("Treino finalizado e modelo registrado.")
+
 
 if __name__ == "__main__":
     main()
