@@ -12,9 +12,23 @@ jobs:
       MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
       MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
       MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
       - name: Build and Run Training
         run: |
+          # Usando a sintaxe nativa do docker (sem hífen)
           docker compose build recommender_app
+
+          # Executa o treino. Certifique-se de que o caminho 'training/train_neural.py'
+          # existe dentro do seu container conforme definido no Dockerfile.
           docker compose run recommender_app python training/train_neural.py
+
+      - name: Finalize Deployment
+        if: success()
+        run: echo "Treinamento concluído com sucesso!"
