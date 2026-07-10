@@ -1,14 +1,16 @@
 # scripts/promote_model.py
 import mlflow
 from mlflow.tracking import MlflowClient
-from mlflow.exceptions import MlflowException
 
-def promote_best_model(experiment_name: str = "retailrocket-recommender", 
-                       model_name: str = "BestRecommender") -> None:
+
+def promote_best_model(
+    experiment_name: str = "retailrocket-recommender",
+    model_name: str = "BestRecommender",
+) -> None:
     """Busca o modelo com melhor desempenho e o promove para o estágio de Produção.
 
-    Identifica a execução (run) com o maior valor de 'ndcg_at_k' dentro do experimento 
-    especificado, registra esse modelo no Model Registry e realiza a transição 
+    Identifica a execução (run) com o maior valor de 'ndcg_at_k' dentro do experimento
+    especificado, registra esse modelo no Model Registry e realiza a transição
     para o estágio 'Production'.
 
     Args:
@@ -46,8 +48,11 @@ def promote_best_model(experiment_name: str = "retailrocket-recommender",
         version=result.version,
         stage="Production",
     )
-    
-    print(f"Modelo {model_name} v{result.version} promovido para Production com sucesso.")
+
+    print(
+        f"Modelo {model_name} v{result.version} promovido para Production com sucesso."
+    )
+
 
 if __name__ == "__main__":
     promote_best_model()

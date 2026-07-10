@@ -5,9 +5,12 @@ como Precision@K, Recall@K, NDCG@K e Catalog Coverage.
 """
 
 import math
-from typing import Dict, List, Callable, Set, Any
+from typing import Any, Callable, Dict, List, Set
 
-def _calculate_precision_at_k(recommended: List[Any], relevant: Set[Any], k: int) -> float:
+
+def _calculate_precision_at_k(
+    recommended: List[Any], relevant: Set[Any], k: int
+) -> float:
     """Calcula a métrica Precision@K para um único usuário.
 
     Args:
@@ -23,6 +26,7 @@ def _calculate_precision_at_k(recommended: List[Any], relevant: Set[Any], k: int
     recommended_k = recommended[:k]
     hits: int = sum(1 for item in recommended_k if item in relevant)
     return hits / k
+
 
 def _calculate_recall_at_k(recommended: List[Any], relevant: Set[Any], k: int) -> float:
     """Calcula a métrica Recall@K para um único usuário.
@@ -41,6 +45,7 @@ def _calculate_recall_at_k(recommended: List[Any], relevant: Set[Any], k: int) -
     hits: int = sum(1 for item in recommended_k if item in relevant)
     return hits / len(relevant)
 
+
 def _calculate_ndcg_at_k(recommended: List[Any], relevant: Set[Any], k: int) -> float:
     """Calcula a métrica NDCG@K (Normalized Discounted Cumulative Gain) para um usuário.
 
@@ -54,17 +59,18 @@ def _calculate_ndcg_at_k(recommended: List[Any], relevant: Set[Any], k: int) -> 
     """
     if not relevant or not recommended:
         return 0.0
-    
+
     dcg: float = 0.0
     for i, item in enumerate(recommended[:k]):
         if item in relevant:
             dcg += 1.0 / math.log2(i + 2)
-            
+
     idcg: float = 0.0
     for i in range(min(len(relevant), k)):
         idcg += 1.0 / math.log2(i + 2)
-        
+
     return dcg / idcg if idcg > 0 else 0.0
+
 
 def avaliar_sistema_recomendacao(
     recommend_fn: Callable[..., List[Any]],
@@ -72,11 +78,11 @@ def avaliar_sistema_recomendacao(
     gt_dict: Dict[Any, List[Any]],
     n_items_total: int,
     k: int = 10,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> Dict[str, float]:
     """Avalia um modelo de recomendação iterando sobre usuários de teste.
 
-    Realiza a predição para todos os usuários fornecidos, calcula as métricas 
+    Realiza a predição para todos os usuários fornecidos, calcula as métricas
     individuais e retorna a média agregada do sistema.
 
     Args:
@@ -93,14 +99,14 @@ def avaliar_sistema_recomendacao(
     precisions: List[float] = []
     recalls: List[float] = []
     ndcgs: List[float] = []
-    
+
     # Conjunto para armazenar todos os itens únicos recomendados (Catalog Coverage)
     todos_itens_recomendados: Set[Any] = set()
 
     for user in test_users:
         if user not in gt_dict:
             continue
-            
+
         itens_relevantes: Set[Any] = set(gt_dict[user])
         if not itens_relevantes:
             continue
@@ -120,11 +126,13 @@ def avaliar_sistema_recomendacao(
     mean_precision: float = sum(precisions) / len(precisions) if precisions else 0.0
     mean_recall: float = sum(recalls) / len(recalls) if recalls else 0.0
     mean_ndcg: float = sum(ndcgs) / len(ndcgs) if ndcgs else 0.0
-    coverage: float = len(todos_itens_recomendados) / n_items_total if n_items_total > 0 else 0.0
+    coverage: float = (
+        len(todos_itens_recomendados) / n_items_total if n_items_total > 0 else 0.0
+    )
 
     return {
         f"Precision{k}": mean_precision,
         f"Recall{k}": mean_recall,
         f"NDCG{k}": mean_ndcg,
-        "Coverage": coverage
+        "Coverage": coverage,
     }

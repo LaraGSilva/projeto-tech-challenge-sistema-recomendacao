@@ -1,60 +1,69 @@
-from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
-from api.service_wrapper import RecommendationService
-from api.schema import RecommendRequest, RecommendResponse
 
-# Variável global para o serviço de recomendação
-service: RecommendationService | None = None
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+
+from api.schema import RecommendRequest, RecommendResponse
+from api.service_wrapper import RecommendationService
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Gerencia o ciclo de vida da aplicação FastAPI.
 
-    Inicializa o serviço de recomendação na inicialização e o limpa
-    no encerramento.
-
-    Args:
-        app: Instância da aplicação FastAPI.
-
-    Yields:
-        None: Controle do ciclo de vida.
+    Inicializa o serviço de recomendação e o anexa ao estado da aplicação.
     """
-    global service
-    service = RecommendationService(model_name="Neural-NeuMF-MLP", alias="production")
+    # Inicialização
+    app.state.service = RecommendationService(
+        model_name="Neural-NeuMF-MLP", alias="production"
+    )
     yield
-    service = None
+    # Limpeza (opcional)
+    app.state.service = None
+
 
 app: FastAPI = FastAPI(lifespan=lifespan)
 
-@app.post("/recommend", response_model=RecommendResponse)
-def recommend(request: RecommendRequest) -> RecommendResponse:
-    """Endpoint para obter recomendações personalizadas de itens.
 
-    Recebe um ID de visitante e o número desejado de itens, retornando
-    uma lista de recomendações baseada no modelo em produção.
+def get_recommendation_service(request: Request) -> RecommendationService:
+    """Extrai o serviço de recomendação do estado da aplicação.
 
     Args:
-        request (RecommendRequest): Objeto contendo 'visitorid' e 'k'.
+        request (Request): Requisição HTTP atual.
 
     Returns:
-        RecommendResponse: Objeto com 'visitorid' e lista de 'recommendations'.
+        RecommendationService: Instância do serviço de recomendação.
 
     Raises:
-        HTTPException: Se o serviço de recomendação não estiver inicializado (503).
+        HTTPException: Se o serviço estiver indisponível (503).
     """
-    if not service:
+    service = getattr(request.app.state, "service", None)
+    if service is None:
         raise HTTPException(
-            status_code=503, 
-            detail="Serviço de recomendação indisponível no momento."
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Serviço de recomendação indisponível.",
         )
-    
+    return service
+
+
+@app.post("/recommend", response_model=RecommendResponse)
+def recommend(
+    request: RecommendRequest,
+    service: RecommendationService = Depends(get_recommendation_service),
+) -> RecommendResponse:
+    """Endpoint para obter recomendações personalizadas.
+
+    Args:
+        request (RecommendRequest): Dados da requisição (visitorid e k).
+        service (RecommendationService): Serviço injetado via dependência.
+
+    Returns:
+        RecommendResponse: Objeto com visitorid e recomendações.
+    """
     recommendations: list[str] = service.get_recommendations(
-        request.visitorid, 
-        request.k
+        request.visitorid, request.k
     )
-    
+
     return RecommendResponse(
-        visitorid=request.visitorid, 
-        recommendations=recommendations
+        visitorid=request.visitorid, recommendations=recommendations
     )

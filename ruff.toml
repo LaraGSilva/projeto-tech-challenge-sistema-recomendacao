@@ -1,0 +1,6 @@
+[lint]
+select = ["E", "F", "I", "N", "PL"]
+ignore = ["E501"]
+
+[lint.pylint]
+max-args = 10
