@@ -25,16 +25,16 @@ stages:
       md5: e74ec953e7b192920b195dfd82dc2a4e
       size: 408929907
   build_features:
-    cmd: python scripts/build_features_local.py
+    cmd: python -m scripts.build_features_local
     deps:
-    - path: data/raw/events.csv
+    - path: scripts/build_features_local.py
+      hash: md5
+      md5: 47dc7a00260e89994eb0fc5632325251
+      size: 2556
+    - path: shared/data/data_csv/raw/events.csv
       hash: md5
       md5: fddaf7c1c6a9df23a726500a08ffdd7e
       size: 94237913
-    - path: scripts/build_features_local.py
-      hash: md5
-      md5: d15932b8e37326a6f8bc3e8b8aba047d
-      size: 1628
     outs:
     - path: data/features/mappings.pkl
       hash: md5
@@ -45,31 +45,40 @@ stages:
       md5: 5ae29971618e247d607b7487c8e219c7
       size: 1231027
   train_baselines:
-    cmd: python src/recommender/models/train_baselines.py
+    cmd: python -m training.train_baselines
     deps:
     - path: data/features/mappings.pkl
       hash: md5
       md5: cf498b7d6a8d9eedb42a49a8d0246295
       size: 4059853
-      isexec: true
     - path: data/features/user_item_matrix.npz
       hash: md5
       md5: 5ae29971618e247d607b7487c8e219c7
       size: 1231027
-      isexec: true
-    - path: src/recommender/evaluation/evaluate.py
+    - path: shared/ml/evaluate_metrics.py
       hash: md5
-      md5: bc65939e40118e086066efb02be94938
-      size: 4005
-      isexec: true
-    - path: src/recommender/models/train_baselines.py
+      md5: 76707c65322c7aa59128d3b91ebdd8d2
+      size: 4996
+    - path: training/train_baselines.py
       hash: md5
-      md5: 7048a137b1a0f7274f6801c1a8b53e0a
-      size: 11259
-      isexec: true
+      md5: d31a07c8292386f395a7caf2cecf1410
+      size: 5540
     outs:
     - path: models/baselines/
       hash: md5
-      md5: 926ac6b38193d095db5ea5d3bddfb60c.dir
-      size: 57998962
-      nfiles: 4
+      md5: 4002a9b201210ebff2dbe1e11981baa3.dir
+      size: 115762650
+      nfiles: 3
+  train_neural:
+    cmd: python -m training.train
+    deps:
+    - path: shared/data/data_csv/raw/events.csv
+      hash: md5
+      md5: fddaf7c1c6a9df23a726500a08ffdd7e
+      size: 94237913
+    outs:
+    - path: models/neural/
+      hash: md5
+      md5: a8c8c6b48934d9a101b3ac7c8c1be483.dir
+      size: 29072254
+      nfiles: 2

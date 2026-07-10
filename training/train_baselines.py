@@ -1,20 +1,23 @@
+import os
 import pickle
 import sys
-import os
 from pathlib import Path
-from typing import Dict, Any, List, Tuple, Callable
+from typing import Any, Dict, List, Tuple
 
 import mlflow
 import numpy as np
 import pandas as pd
-from scipy.sparse import load_npz, csr_matrix
+from scipy.sparse import csr_matrix, load_npz
 
 # Ajuste do path para importar módulos da arquitetura
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
-from shared.utils.config import load_config
 from shared.ml.evaluate_metrics import avaliar_sistema_recomendacao
 from shared.ml.model_factory import ModelFactory
+from shared.utils.config import load_config
+
+OUTPUT_DIR = Path("models/baselines")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 mlflow.set_experiment("retailrocket-recommender")
@@ -24,11 +27,12 @@ MATRIX_PATH: Path = Path("data/features/user_item_matrix.npz")
 MAPPINGS_PATH: Path = Path("data/features/mappings.pkl")
 SEED: int = 42
 
+
 def load_artifacts() -> Tuple[csr_matrix, Dict[str, Any]]:
     """Carrega a matriz esparsa e os mapeamentos do projeto.
 
     Returns:
-        Tuple[csr_matrix, Dict[str, Any]]: Uma tupla contendo a matriz de interações 
+        Tuple[csr_matrix, Dict[str, Any]]: Uma tupla contendo a matriz de interações
         (csr_matrix) e o dicionário de mapeamentos.
     """
     matrix: csr_matrix = load_npz(MATRIX_PATH)
@@ -36,10 +40,9 @@ def load_artifacts() -> Tuple[csr_matrix, Dict[str, Any]]:
         mappings: Dict[str, Any] = pickle.load(f)
     return matrix, mappings
 
+
 def _build_ground_truth(
-    matrix: csr_matrix, 
-    mappings: Dict[str, Any], 
-    test_users_idx: List[int]
+    matrix: csr_matrix, mappings: Dict[str, Any], test_users_idx: List[int]
 ) -> Dict[int, List[int]]:
     """Reconstrói o dicionário de ground truth para avaliação.
 
@@ -49,7 +52,7 @@ def _build_ground_truth(
         test_users_idx (List[int]): Lista de índices de usuários para teste.
 
     Returns:
-        Dict[int, List[int]]: Dicionário onde chaves são IDs originais dos usuários 
+        Dict[int, List[int]]: Dicionário onde chaves são IDs originais dos usuários
         e valores são listas de IDs originais dos itens relevantes.
     """
     gt_dict: Dict[int, List[int]] = {}
@@ -64,6 +67,7 @@ def _build_ground_truth(
             gt_dict[original_user_id] = original_items
     return gt_dict
 
+
 def run_baseline_training() -> None:
     """Orquestra o treinamento e avaliação dos modelos baselines.
 
@@ -75,11 +79,15 @@ def run_baseline_training() -> None:
     cfg: Dict[str, Any] = load_config()
     matrix, mappings = load_artifacts()
     n_users, n_items = matrix.shape
-    
+
     # 1. Seleção de usuários para teste
     rng: np.random.Generator = np.random.default_rng(SEED)
-    test_users_idx: List[int] = rng.choice(n_users, size=min(5_000, n_users), replace=False).tolist()
-    gt_dict: Dict[int, List[int]] = _build_ground_truth(matrix, mappings, test_users_idx)
+    test_users_idx: List[int] = rng.choice(
+        n_users, size=min(5_000, n_users), replace=False
+    ).tolist()
+    gt_dict: Dict[int, List[int]] = _build_ground_truth(
+        matrix, mappings, test_users_idx
+    )
     test_users: List[int] = list(gt_dict.keys())
 
     # 2. Configurações dos modelos
@@ -87,18 +95,18 @@ def run_baseline_training() -> None:
         "popularity": {"config": {"matrix": matrix, "mappings": mappings}},
         "knn": {
             "config": {
-                "matrix": matrix, 
-                "mappings": mappings, 
-                "k": cfg['baselines']['knn']['k_neighbors']
+                "matrix": matrix,
+                "mappings": mappings,
+                "k": cfg["baselines"]["knn"]["k_neighbors"],
             }
         },
         "svd": {
             "config": {
-                "matrix": matrix, 
-                "mappings": mappings, 
-                "n_components": cfg['baselines']['svd']['n_components']
+                "matrix": matrix,
+                "mappings": mappings,
+                "n_components": cfg["baselines"]["svd"]["n_components"],
             }
-        }
+        },
     }
 
     df_raw: pd.DataFrame = pd.read_csv("shared/data/data_csv/raw/events.csv")
@@ -113,22 +121,30 @@ def run_baseline_training() -> None:
 
             # Instancia via Factory
             model = ModelFactory.create_model(name, params["config"], mappings)
-            
+
+            model_path = OUTPUT_DIR / f"{name}.pkl"
+
+            with open(model_path, "wb") as f:
+                pickle.dump(model, f)
+
+            mlflow.log_artifact(str(model_path), artifact_path="models")
+
             # Avaliação padronizada
             metrics: Dict[str, float] = avaliar_sistema_recomendacao(
                 recommend_fn=model.recommend,
                 test_users=test_users,
                 gt_dict=gt_dict,
                 n_items_total=n_items,
-                k=cfg['baselines'].get('n_recs', 10)
+                k=cfg["baselines"].get("n_recs", 10),
             )
-            
+
             # Logging no MLflow
             if name != "popularity":
                 mlflow.log_params(params["config"])
             mlflow.log_metrics({f"eval.{k.lower()}": v for k, v in metrics.items()})
-            
+
             print(f"Baseline {name} concluído. Métricas: {metrics}")
+
 
 if __name__ == "__main__":
     run_baseline_training()
