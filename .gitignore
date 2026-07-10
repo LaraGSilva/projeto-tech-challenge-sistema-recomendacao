@@ -1,6 +1,5 @@
 .venv
-shared/data/data_csv/
-data/
+shared/data/data_csv/raw/events.csv
 data/processed/
 models/*.pt
 __pycache__/
@@ -9,3 +8,7 @@ mlflow.db
 mlruns
 .venv/
 .env
+.ruff_cache
+.pystest_cache
+.vscode
+.dvc
