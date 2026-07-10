@@ -25,10 +25,6 @@ jobs:
           # Usando a sintaxe nativa do docker (sem hífen)
           docker compose build recommender_app
 
-          # Executa o treino. Certifique-se de que o caminho 'training/train_neural.py'
-          # existe dentro do seu container conforme definido no Dockerfile.
-          docker compose run recommender_app python training/train.py
-
       - name: Finalize Deployment
         if: success()
         run: echo "Treinamento concluído com sucesso!"
