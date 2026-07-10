@@ -5,6 +5,7 @@ data/processed/
 models/*.pt
 __pycache__/
 .dvc
-.env
 mlflow.db
 mlruns
+.venv/
+.env

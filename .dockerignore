@@ -27,7 +27,7 @@ artifacts
 outputs
 logs
 
-.env
+.venv
 
 *.csv
 *.parquet

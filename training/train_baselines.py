@@ -16,6 +16,9 @@ from shared.ml.evaluate_metrics import avaliar_sistema_recomendacao
 from shared.ml.model_factory import ModelFactory
 from shared.utils.config import load_config
 
+OUTPUT_DIR = Path("models/baselines")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 mlflow.set_experiment("retailrocket-recommender")
 
@@ -118,6 +121,13 @@ def run_baseline_training() -> None:
 
             # Instancia via Factory
             model = ModelFactory.create_model(name, params["config"], mappings)
+
+            model_path = OUTPUT_DIR / f"{name}.pkl"
+
+            with open(model_path, "wb") as f:
+                pickle.dump(model, f)
+
+            mlflow.log_artifact(str(model_path), artifact_path="models")
 
             # Avaliação padronizada
             metrics: Dict[str, float] = avaliar_sistema_recomendacao(

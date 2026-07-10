@@ -1,38 +1,26 @@
 stages:
-  # ==========================================
-  # STAGE 1: Geração de Features
-  # ==========================================
   build_features:
-    cmd: python scripts/build_features_local.py
+    cmd: python -m scripts.build_features_local
     deps:
+      - shared/data/data_csv/raw/events.csv
       - scripts/build_features_local.py
-      - data/raw/events.csv
     outs:
-      - data/features/user_item_matrix.npz
       - data/features/mappings.pkl
+      - data/features/user_item_matrix.npz
 
-  # ==========================================
-  # STAGE 2: Treinamento dos Baselines (Scikit-Learn)
-  # ==========================================
   train_baselines:
-    cmd: python src/recommender/models/train_baselines.py
+    cmd: python -m training.train_baselines
     deps:
-      - src/recommender/models/train_baselines.py
-      - src/recommender/evaluation/evaluate.py
-      - data/features/user_item_matrix.npz
       - data/features/mappings.pkl
+      - data/features/user_item_matrix.npz
+      - shared/ml/evaluate_metrics.py
+      - training/train_baselines.py
     outs:
       - models/baselines/
 
-  # ==========================================
-  # STAGE 3: Treinamento da Rede Neural (PyTorch)
-  # ==========================================
   train_neural:
-    cmd: python -c "from src.recommender.models.train_neural import main; main()"
+    cmd: python -m training.train
     deps:
-      - src/recommender/models/train_neural.py
-      - src/recommender/evaluation/evaluate.py
-      - data/raw/events.csv
-      - data/raw/item_properties_part1.csv
-      - data/raw/item_properties_part2.csv
-      - configs/model_params.yaml
+      - shared/data/data_csv/raw/events.csv
+    outs:
+      - models/neural/

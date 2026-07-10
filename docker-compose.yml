@@ -2,30 +2,42 @@ services:
   recommender_app:
     build:
       context: .
-      target: builder
+      target: runtime
     container_name: recommender_app
+
     ports:
       - "8000:8000"
+
     mem_limit: 5g
+
     volumes:
-      - .:/app
-      - ./mlflow_data:/data
+    - .:/app
+    - ./mlflow_data:/data
+
     environment:
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      PYTHONUNBUFFERED: 1
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+
+
     depends_on:
       - mlflow
-    command: uvicorn main:app --host 0.0.0.0
+
+    command:  python -m uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:latest
+
     container_name: mlflow_server
+
     ports:
       - "5000:5000"
-    environment:
-      - MLFLOW_BACKEND_STORE_URI=sqlite:////data/mlflow.db
-      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/data/mlruns
+
     volumes:
       - ./mlflow_data:/data
+
+    environment:
+      MLFLOW_BACKEND_STORE_URI: sqlite:////data/mlflow.db
+      MLFLOW_DEFAULT_ARTIFACT_ROOT: /data/mlruns
 
     command: >
       mlflow server
@@ -34,4 +46,3 @@ services:
       --host 0.0.0.0
       --serve-artifacts
       --allowed-hosts "*"
-      --serve-artifacts

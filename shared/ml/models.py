@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
@@ -7,19 +7,7 @@ from torch import nn
 
 
 class NeuMFConfig(BaseModel):
-    """Configuração centralizada para o modelo NeuMF usando Pydantic.
-
-    Attributes:
-        n_users (int): Número total de usuários únicos.
-        n_items (int): Número total de itens únicos.
-        n_categorias (int): Número total de categorias.
-        item_to_cat_array (List[int]): Mapeamento estático de índice de item para categoria.
-        mf_dim (int): Dimensão do embedding para o ramo de Fatoração de Matriz (GMF).
-        mlp_dim (int): Dimensão do embedding para o ramo MLP.
-        categoria_dim (int): Dimensão do embedding de categoria.
-        hidden_dims (List[int]): Dimensões das camadas ocultas da MLP.
-        dropout (float): Taxa de dropout para regularização.
-    """
+    """Configuração centralizada para o modelo NeuMF usando Pydantic."""
 
     n_users: int
     n_items: int
@@ -35,36 +23,20 @@ class NeuMFConfig(BaseModel):
 class BaseRecommender(nn.Module):
     """Interface unificada para modelos de recomendação."""
 
-    # Adicionando atributos necessários para o método recommend funcionar
-    user_to_idx: Dict[int, int]
-    idx_to_item: Dict[int, int]
+    def __init__(self) -> None:
+        super().__init__()
+        # Inicializamos como None para permitir a injeção dinâmica posterior
+        self.user_to_idx: Optional[Dict[int, int]] = None
+        self.idx_to_item: Optional[Dict[int, int]] = None
 
     def recommend(self, user_id: int, k: int, **kwargs: Any) -> List[int]:
-        """Gera recomendações para um usuário dado.
-
-        Args:
-            user_id (int): ID único do usuário.
-            k (int): Número de itens a recomendar.
-            **kwargs (Any): Argumentos adicionais.
-
-        Returns:
-            List[int]: Lista de IDs dos itens recomendados.
-
-        Raises:
-            NotImplementedError: Se o método não for implementado pela subclasse.
-        """
         raise NotImplementedError("Subclasses devem implementar recommend()")
 
 
-class NeumfRetailrocketCpu(BaseRecommender):
+class NeuMF_Light(BaseRecommender):  # noqa: N801
     """Modelo Neural Matrix Factorization para o dataset RetailRocket."""
 
     def __init__(self, config: NeuMFConfig) -> None:
-        """Inicializa as camadas do modelo NeuMF.
-
-        Args:
-            config (NeuMFConfig): Objeto de configuração contendo os hiperparâmetros.
-        """
         super().__init__()
 
         self.user_mf_embed = nn.Embedding(config.n_users, config.mf_dim)
@@ -95,15 +67,6 @@ class NeumfRetailrocketCpu(BaseRecommender):
         self.prediction_layer = nn.Linear(config.mf_dim + config.hidden_dims[-1], 1)
 
     def forward(self, user_idx: torch.Tensor, item_idx: torch.Tensor) -> torch.Tensor:
-        """Define o fluxo de dados (forward pass) do modelo.
-
-        Args:
-            user_idx (torch.Tensor): Tensores de índices dos usuários.
-            item_idx (torch.Tensor): Tensores de índices dos itens.
-
-        Returns:
-            torch.Tensor: Scores de preferência previstos.
-        """
         user_mf = self.user_mf_embed(user_idx)
         item_mf = self.item_mf_embed(item_idx)
         gmf_vector = user_mf * item_mf
@@ -118,25 +81,35 @@ class NeumfRetailrocketCpu(BaseRecommender):
         )
 
     def recommend(self, user_id: int, k: int, **kwargs: Any) -> List[int]:
-        """Gera recomendações ordenadas para um usuário.
+        """Gera recomendações ordenadas para um usuário."""
+        # Acesso seguro aos atributos injetados
+        if self.user_to_idx is None or self.idx_to_item is None:
+            raise AttributeError("Mapeamentos não foram injetados no modelo.")
 
-        Args:
-            user_id (int): ID do usuário.
-            k (int): Quantidade de itens a retornar.
-            **kwargs (Any): Parâmetros opcionais.
-
-        Returns:
-            List[int]: Lista de IDs de itens recomendados.
-        """
-        if not hasattr(self, "user_to_idx") or user_id not in self.user_to_idx:
+        if user_id not in self.user_to_idx:
             return []
 
         u_idx = self.user_to_idx[user_id]
+
+        # Cria tensores para todos os itens disponíveis
         all_item_idxs = torch.arange(len(self.idx_to_item))
         user_t = torch.full((len(all_item_idxs),), u_idx)
 
+        # Inferência
         with torch.no_grad():
-            scores = self.forward(user_t, all_item_idxs).numpy()
+            scores = self.forward(user_t, all_item_idxs).cpu().numpy()
 
-        top_indices = np.argsort(scores)[::-1][:k]
-        return [self.idx_to_item[i] for i in top_indices]
+        # Ordena os scores
+        top_indices = np.argsort(scores)[::-1]
+
+        # Filtra apenas os índices que existem no dicionário idx_to_item
+        valid_recommendations = []
+        for i in top_indices:
+            idx = int(i)
+            if idx in self.idx_to_item:
+                valid_recommendations.append(self.idx_to_item[idx])
+
+            if len(valid_recommendations) == k:
+                break
+
+        return valid_recommendations

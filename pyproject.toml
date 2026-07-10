@@ -12,7 +12,8 @@ dependencies = [
     "scikit-learn>=1.9.0",
     "torch>=2.12.0",
     "pydantic-settings>=2.14.1",
-    "pytest>=9.0.3"
+    "pytest>=9.0.3",
+    "uvicorn>=0.49.0"
 ]
 
 [dependency-groups]
@@ -28,4 +29,5 @@ dev = [
     "pytest>=9.0.3",
     "pytest-mock>=3.15.1",
     "ruff>=0.15.16",
+    "uvicorn>=0.49.0"
 ]
