@@ -1,0 +1,75 @@
+schema: '2.0'
+stages:
+  unzip:
+    cmd: python scripts/unzip_dataset.py
+    deps:
+    - path: data/raw/ecommerce-dataset.zip
+      hash: md5
+      md5: 9c8a6e502a5e71a00e49c0ac8b95a87f
+      size: 304719974
+    outs:
+    - path: data/raw/category_tree.csv
+      hash: md5
+      md5: f0e1eb878ae66209004112f6355d7e83
+      size: 14454
+    - path: data/raw/events.csv
+      hash: md5
+      md5: fddaf7c1c6a9df23a726500a08ffdd7e
+      size: 94237913
+    - path: data/raw/item_properties_part1.csv
+      hash: md5
+      md5: cb43a0682a1af76f1c1b60f9163ae47b
+      size: 484315749
+    - path: data/raw/item_properties_part2.csv
+      hash: md5
+      md5: e74ec953e7b192920b195dfd82dc2a4e
+      size: 408929907
+  build_features:
+    cmd: python scripts/build_features_local.py
+    deps:
+    - path: data/raw/events.csv
+      hash: md5
+      md5: fddaf7c1c6a9df23a726500a08ffdd7e
+      size: 94237913
+    - path: scripts/build_features_local.py
+      hash: md5
+      md5: d15932b8e37326a6f8bc3e8b8aba047d
+      size: 1628
+    outs:
+    - path: data/features/mappings.pkl
+      hash: md5
+      md5: cf498b7d6a8d9eedb42a49a8d0246295
+      size: 4059853
+    - path: data/features/user_item_matrix.npz
+      hash: md5
+      md5: 5ae29971618e247d607b7487c8e219c7
+      size: 1231027
+  train_baselines:
+    cmd: python src/recommender/models/train_baselines.py
+    deps:
+    - path: data/features/mappings.pkl
+      hash: md5
+      md5: cf498b7d6a8d9eedb42a49a8d0246295
+      size: 4059853
+      isexec: true
+    - path: data/features/user_item_matrix.npz
+      hash: md5
+      md5: 5ae29971618e247d607b7487c8e219c7
+      size: 1231027
+      isexec: true
+    - path: src/recommender/evaluation/evaluate.py
+      hash: md5
+      md5: bc65939e40118e086066efb02be94938
+      size: 4005
+      isexec: true
+    - path: src/recommender/models/train_baselines.py
+      hash: md5
+      md5: 7048a137b1a0f7274f6801c1a8b53e0a
+      size: 11259
+      isexec: true
+    outs:
+    - path: models/baselines/
+      hash: md5
+      md5: 926ac6b38193d095db5ea5d3bddfb60c.dir
+      size: 57998962
+      nfiles: 4

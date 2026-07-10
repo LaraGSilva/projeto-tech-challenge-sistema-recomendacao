@@ -1,0 +1,13 @@
+model:
+  mf_dim: 16
+  mlp_dim: 32
+train:
+  batch_size: 4096
+  learning_rate: 0.001
+  epochs: 3
+baselines:
+  n_recs: 10  # Adicione esta linha
+  knn:
+    k_neighbors: 20
+  svd:
+    n_components: 50

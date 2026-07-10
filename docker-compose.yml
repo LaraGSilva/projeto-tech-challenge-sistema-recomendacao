@@ -1,0 +1,35 @@
+services:
+  recommender_app:
+    build: .
+    container_name: recommender_app
+    ports:
+      - "8000:8000"
+    mem_limit: 5g
+    volumes:
+      - .:/app
+      - ./mlflow_data:/data
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    depends_on:
+      - mlflow
+    command: tail -f /dev/null
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow_server
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:////data/mlflow.db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/data/mlruns
+    volumes:
+      - ./mlflow_data:/data
+
+    command: >
+      mlflow server 
+      --backend-store-uri sqlite:////data/mlflow.db 
+      --default-artifact-root /data/mlruns 
+      --host 0.0.0.0 
+      --serve-artifacts
+      --allowed-hosts "*"
+      --serve-artifacts
