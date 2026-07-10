@@ -27,7 +27,7 @@ jobs:
 
           # Executa o treino. Certifique-se de que o caminho 'training/train_neural.py'
           # existe dentro do seu container conforme definido no Dockerfile.
-          docker compose run recommender_app python training/train_neural.py
+          docker compose run recommender_app python training/train.py
 
       - name: Finalize Deployment
         if: success()
