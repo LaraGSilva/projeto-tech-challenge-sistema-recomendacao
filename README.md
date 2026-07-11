@@ -22,7 +22,9 @@
 
 ---
 ## 📖 Introdução
+📽️ *Apresentação da solução como método Star*: https://canva.link/1bsjypq5475rblm
 
+## 📖 Introdução
 Este repositório implementa um **sistema de recomendação de produtos para e-commerce**
 de ponta a ponta — desde a ingestão e versionamento dos dados brutos até o deploy de um
 modelo de deep learning servido via API REST — seguindo práticas profissionais de
@@ -52,33 +54,9 @@ clássico de **feedback implícito**.
 
 ---
 
-## 🔎 Visão Geral
+## 🔎 Arquitetura | Macro visão
 
-```mermaid
-mindmap
-  root((E-commerce<br/>Recommender))
-    Dados
-      RetailRocket Dataset
-      Eventos implícitos
-      DVC versionado
-    Modelo
-      NeuMF - GMF + MLP
-      PyTorch
-      Embeddings usuário/item
-    MLOps
-      MLflow Tracking
-      MLflow Model Registry
-      DVC Pipeline
-    Infraestrutura
-      Docker multi-stage
-      Docker Compose
-      FastAPI Serving
-    Qualidade
-      Clean Code / SOLID
-      Ruff + Pre-commit
-      Testes automatizados
-```
-
+![imagem da arquitetura](./documents/arquitetura.png)
 O sistema é dividido em três grandes blocos que conversam entre si através de
 artefatos versionados (dados no DVC, modelos no MLflow Registry):
 
@@ -86,26 +64,6 @@ artefatos versionados (dados no DVC, modelos no MLflow Registry):
 2. **Camada de Treinamento** — treino do modelo NeuMF em PyTorch, comparação com baselines Scikit-Learn, tudo rastreado no MLflow.
 3. **Camada de Serviço** — API FastAPI que carrega o modelo em `Production` no MLflow Registry e serve recomendações em tempo real.
 
----
-
-## 🏗️ Arquitetura do Sistema
-
-O sistema é orquestrado via Docker, separando o ambiente de processamento (Aplicação) do ambiente de rastreamento (MLflow).
-
-```mermaid
-graph TD
-    subgraph "Ambiente Local (Desenvolvimento)"
-        A[Dados: events.csv] -->|Carrega| B[recommender_app]
-        B -->|Treino/Logs| C[MLflow Tracking Server]
-        C <--> D[(mlflow.db)]
-        C -->|Armazena Artefatos| E[Pasta mlruns]
-    end
-
-    subgraph "Docker Containers"
-        B
-        C
-    end
-```
 ---
 
 ## 📁 Estrutura do Projeto
