@@ -15,7 +15,9 @@ class RecommendationService:
         """Inicializa o serviço carregando o modelo e os mapeamentos."""
 
         # 1. Obter URI e baixar artefatos do MLflow
-        model_uri: str = f"models:/{model_name}@{alias}"
+        model_uri: str = (
+            "mlflow_data/mlruns/1/bab960f7ae894ac0a8367085459fbf1f/artifacts/"
+        )
         local_path: str = mlflow.artifacts.download_artifacts(artifact_uri=model_uri)
 
         # 2. Carregar o arquivo de mapeamentos (mappings.npy)
@@ -61,3 +63,7 @@ class RecommendationService:
     def get_recommendations(self, user_id: int, k: int) -> List[int]:
         """Gera recomendações para um usuário específico."""
         return self.model.recommend(user_id, k)
+
+    def get_all_visitor_ids(self) -> List[int]:
+        """Recupera todos os IDs de usuários conhecidos pelo modelo."""
+        return list(self.model.user_to_idx.keys())

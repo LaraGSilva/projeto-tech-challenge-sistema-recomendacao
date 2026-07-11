@@ -31,3 +31,14 @@ class RecommendResponse(BaseModel):
     recommendations: List[int] = Field(
         ..., description="Lista de IDs dos itens recomendados"
     )
+
+
+class AllRecommendationsResponse(BaseModel):
+    """Schema de resposta para o endpoint de recomendações.
+
+    Atributos para todos os clientes:
+        visitorid (int): O identificador do usuário que solicitou as recomendações.
+        recommendations (List[int]): Lista contendo os IDs dos itens recomendados.
+    """
+
+    recommendations: List[dict]
