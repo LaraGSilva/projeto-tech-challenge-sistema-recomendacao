@@ -175,13 +175,6 @@ variáveis obrigatórias do `.env` e conectividade com o MLflow Tracking Server.
 ```bash
 pre-commit install
 ```
-
-### 6. Rodar os testes
-
-```bash
-pytest -v --cov=shared --cov=api --cov=training
-```
-
 ---
 
 ## 🐳 Docker
