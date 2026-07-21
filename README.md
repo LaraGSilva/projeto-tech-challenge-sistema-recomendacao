@@ -22,7 +22,9 @@
 
 ---
 ## 📖 Introdução
+📽️ *Apresentação da solução como método Star*: https://canva.link/1bsjypq5475rblm
 
+## 📖 Introdução
 Este repositório implementa um **sistema de recomendação de produtos para e-commerce**
 de ponta a ponta — desde a ingestão e versionamento dos dados brutos até o deploy de um
 modelo de deep learning servido via API REST — seguindo práticas profissionais de
@@ -52,33 +54,9 @@ clássico de **feedback implícito**.
 
 ---
 
-## 🔎 Visão Geral
+## 🔎 Arquitetura | Macro visão
 
-```mermaid
-mindmap
-  root((E-commerce<br/>Recommender))
-    Dados
-      RetailRocket Dataset
-      Eventos implícitos
-      DVC versionado
-    Modelo
-      NeuMF - GMF + MLP
-      PyTorch
-      Embeddings usuário/item
-    MLOps
-      MLflow Tracking
-      MLflow Model Registry
-      DVC Pipeline
-    Infraestrutura
-      Docker multi-stage
-      Docker Compose
-      FastAPI Serving
-    Qualidade
-      Clean Code / SOLID
-      Ruff + Pre-commit
-      Testes automatizados
-```
-
+![imagem da arquitetura](./documents/arquitetura.png)
 O sistema é dividido em três grandes blocos que conversam entre si através de
 artefatos versionados (dados no DVC, modelos no MLflow Registry):
 
@@ -86,26 +64,6 @@ artefatos versionados (dados no DVC, modelos no MLflow Registry):
 2. **Camada de Treinamento** — treino do modelo NeuMF em PyTorch, comparação com baselines Scikit-Learn, tudo rastreado no MLflow.
 3. **Camada de Serviço** — API FastAPI que carrega o modelo em `Production` no MLflow Registry e serve recomendações em tempo real.
 
----
-
-## 🏗️ Arquitetura do Sistema
-
-O sistema é orquestrado via Docker, separando o ambiente de processamento (Aplicação) do ambiente de rastreamento (MLflow).
-
-```mermaid
-graph TD
-    subgraph "Ambiente Local (Desenvolvimento)"
-        A[Dados: events.csv] -->|Carrega| B[recommender_app]
-        B -->|Treino/Logs| C[MLflow Tracking Server]
-        C <--> D[(mlflow.db)]
-        C -->|Armazena Artefatos| E[Pasta mlruns]
-    end
-
-    subgraph "Docker Containers"
-        B
-        C
-    end
-```
 ---
 
 ## 📁 Estrutura do Projeto
@@ -176,16 +134,13 @@ projeto-tech-challenge/
 ---
 
 ## 🛠 Instalação
-
 ### Pré-requisitos
-
 - Python **3.11+**
 - [`uv`](https://github.com/astral-sh/uv) para gerenciamento de dependências
 - Docker e Docker Compose (opcional, mas recomendado)
 - Git e [DVC](https://dvc.org/) (`pip install dvc` ou via `uv`)
 
 ### 1. Clonar o repositório
-
 ```bash
 git clone https://github.com/<seu-usuario>/projeto-tech-challenge.git
 cd projeto-tech-challenge
@@ -196,7 +151,6 @@ cd projeto-tech-challenge
 ```bash
 uv sync
 ```
-
 Isso cria um `.venv` local e instala exatamente as versões travadas em `uv.lock`,
 garantindo reprodutibilidade entre máquinas.
 
@@ -205,29 +159,6 @@ Ativar o ambiente:
 ```bash
 source .venv/bin/activate      # Linux / macOS
 .venv\Scripts\activate         # Windows
-```
-
-### 3. Configurar variáveis de ambiente
-
-```bash
-cp .env.example .env
-```
-
-Principais variáveis:
-
-```dotenv
-# .env.example
-MLFLOW_TRACKING_URI=http://localhost:5000
-MLFLOW_MODEL_NAME=neumf-recommender
-MLFLOW_MODEL_STAGE=Production
-
-DVC_REMOTE_URL=./data/dvc-storage   # ou s3://meu-bucket/dvc-storage
-
-API_HOST=0.0.0.0
-API_PORT=8000
-
-RANDOM_SEED=42
-LOG_LEVEL=INFO
 ```
 
 ### 4. Validar o ambiente
@@ -254,41 +185,16 @@ pytest -v --cov=shared --cov=api --cov=training
 ---
 
 ## 🐳 Docker
-
 O projeto utiliza um **Dockerfile multi-stage** para separar as dependências de build
 (compiladores, wheels do PyTorch) da imagem final de runtime, reduzindo
 significativamente o tamanho da imagem publicada.
 
-```mermaid
-flowchart LR
-    subgraph BUILDER["🔨 Stage: builder"]
-        B1["python:3.11-slim"]
-        B2["instala uv"]
-        B3["uv sync --no-dev"]
-        B4[".venv completo"]
-        B1 --> B2 --> B3 --> B4
-    end
-
-    subgraph RUNTIME["🚀 Stage: runtime"]
-        R1["python:3.11-slim"]
-        R2["copia .venv do builder"]
-        R3["copia código (api/, shared/)"]
-        R4["usuário non-root"]
-        R5["CMD uvicorn api.app:app"]
-        R1 --> R2 --> R3 --> R4 --> R5
-    end
-
-    BUILDER -.copy --from=builder.-> RUNTIME
-```
-
 ### Build da imagem
-
 ```bash
-docker build -t ecommerce-recommender:latest -f dockerfile .
+docker-compose build
 ```
 
 ### Subir com Docker Compose
-
 O `docker-compose.yml` orquestra dois serviços: a **API de recomendação** e o
 **MLflow Tracking Server**.
 
@@ -300,26 +206,6 @@ docker-compose up --build
 |---|---|---|
 | `api` | `8000` | API FastAPI servindo o modelo `Production` |
 | `mlflow` | `5000` | UI e backend de tracking do MLflow |
-
-```yaml
-# docker-compose.yml (resumo ilustrativo)
-services:
-  mlflow:
-    build: .
-    command: mlflow server --host 0.0.0.0 --port 5000
-                --backend-store-uri sqlite:///mlflow_data/mlflow.db
-                --default-artifact-root ./mlflow_data/artifacts
-    ports: ["5000:5000"]
-    volumes: ["./mlflow_data:/app/mlflow_data"]
-
-  api:
-    build:
-      context: .
-      dockerfile: dockerfile
-    ports: ["8000:8000"]
-    env_file: .env
-    depends_on: [mlflow]
-```
 
 ---
 
@@ -344,32 +230,6 @@ flowchart LR
     style E fill:#1b3d2e,stroke:#22c55e,color:#fff
 ```
 
-```yaml
-# dvc.yaml
-stages:
-  preprocess:
-    cmd: python training/preprocess.py
-    deps: [training/preprocess.py, data/raw]
-    outs: [data/interim/clean.parquet]
-
-  feature_eng:
-    cmd: python training/feature_engineering.py
-    deps: [training/feature_engineering.py, data/interim/clean.parquet]
-    outs: [data/processed/features.parquet]
-
-  train:
-    cmd: python training/train.py
-    deps: [training/train.py, data/processed/features.parquet, configs/model_config.yaml]
-    params: [training.epochs, training.lr, training.batch_size]
-    outs: [models/neumf_checkpoint.pt]
-    metrics: [documents/train_metrics.json]
-
-  evaluate:
-    cmd: python training/evaluate.py
-    deps: [training/evaluate.py, models/neumf_checkpoint.pt]
-    metrics: [documents/eval_metrics.json]
-```
-
 ### Comandos essenciais
 
 ```bash
@@ -387,7 +247,6 @@ dvc pull                          # baixa dados/artefatos versionados
 ## 📊 MLflow — Tracking e Registry
 
 Todo run de treinamento loga automaticamente:
-
 - **Parâmetros**: `learning_rate`, `embedding_dim`, `batch_size`, `epochs`, `seed`, arquitetura das camadas MLP.
 - **Métricas por época**: `train_loss`, `val_loss`, `HR@10`, `NDCG@10`, `precision@10`, `recall@10`.
 - **Artefatos**: checkpoint do modelo, curva de treino (PNG), matriz de confusão de classificação implícita, `Model Card` em Markdown.
@@ -414,7 +273,6 @@ with mlflow.start_run(run_name="neumf-v1"):
 ```
 
 ### 3. Visualizar Experimentos
-
 Abra o seu navegador e acesse: `http://localhost:5000` 🌐
 ---
 
@@ -427,9 +285,7 @@ Abra o seu navegador e acesse: `http://localhost:5000` 🌐
 ---
 
 ## 🛍 Dataset RetailRocket
-
 Fonte: [Kaggle — RetailRocket Recommender System Dataset](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset)
-
 Dados reais e anonimizados de comportamento de usuários coletados por 4,5 meses em um
 site de e-commerce russo. Composto por três arquivos:
 
@@ -445,12 +301,9 @@ site de e-commerce russo. Composto por três arquivos:
 - Taxa de conversão `view → transaction` extremamente baixa (~1,2%), típica de cenários de e-commerce real — reforçando a necessidade de **feedback implícito** e amostragem negativa.
 
 ## 🧠 Arquitetura do Modelo — NeuMF (Model Card)
-
 ### Visão geral da arquitetura
-
 O modelo implementado é o **NeuMF (Neural Matrix Factorization)**, proposto por He et
 al. (2017), que combina duas sub-redes complementares:
-
 - **GMF (Generalized Matrix Factorization)** — generalização do produto interno clássico de fatoração de matrizes, capturando interações lineares.
 - **MLP (Multi-Layer Perceptron)** — captura interações não-lineares de alta ordem entre embeddings de usuário e item.
 
@@ -481,15 +334,13 @@ flowchart TB
 ```
 
 ### Iniciando a API localmente
-
 ```bash
 uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### Via Docker Compose
-
 ```bash
-docker-compose up api
+docker compose exec recommender_app python -m uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ---
@@ -498,78 +349,51 @@ docker-compose up api
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/health` | Health check da aplicação e do modelo carregado |
-| `GET` | `/model/info` | Metadados do modelo em produção (versão, stage, métricas) |
-| `POST` | `/recommend` | Retorna top-K produtos recomendados para um usuário |
-| `POST` | `/similar-items` | Retorna itens similares a um item de referência ("quem viu, também viu") |
-| `GET` | `/docs` | Documentação interativa (Swagger UI) |
-| `GET` | `/redoc` | Documentação alternativa (ReDoc) |
+| `GET` | `/health` | retorna o Health check da aplicação |
+| `GET` | `/recommend/{visitor_id}` | retorna a recomendação de 10 produtos de um visitor_id especifico |
+| `GET` | `/recommend/list/all` | retorna todos os visitor_id e os produtos recomendados |
 
 ---
 
 ## 📘 Swagger / OpenAPI
-
 A documentação interativa é gerada automaticamente pelo FastAPI e disponibilizada em:
-
 ```
 http://localhost:8000/docs      # Swagger UI
 http://localhost:8000/redoc     # ReDoc
 ```
-
 Todos os schemas de request/response são derivados diretamente das classes Pydantic
 em `api/schema.py`, garantindo que a documentação nunca fique dessincronizada do
 código.
-
 ---
 
 ## 📮 Exemplos de Requisição
-
 ### Recomendação para um usuário
 
 ```bash
-curl -X POST "http://localhost:8000/recommend" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "user_id": 123,
-        "top_k": 10,
-        "exclude_seen": true
-      }'
+http://localhost:8000/recommend/51
 ```
-
 **Resposta:**
-
 ```json
-{
-  "user_id": 123,
-  "recommendations": [
-    {"item_id": 45210, "score": 0.9421, "category": "electronics"},
-    {"item_id": 18823, "score": 0.9187, "category": "home-appliances"},
-    {"item_id": 90112, "score": 0.8965, "category": "electronics"}
-  ],
-  "model_version": "7",
-  "model_stage": "Production",
-  "latency_ms": 12.4
-}
+{"visitorid":51,"recommendations":[28349,68844,16140,37734,16130,80934,51574,15488,65076,3743]}
 ```
 
-### Itens similares
-
+### all visitor
 ```bash
-curl -X POST "http://localhost:8000/similar-items" \
-  -H "Content-Type: application/json" \
-  -d '{"item_id": 45210, "top_k": 5}'
+http://localhost:8000/recommend/list/all
+```
+**Resposta:**
+```json
+{"visitorid":51,"recommendations":[28349,68844,16140,37734,16130,80934,51574,15488,65076,3743], .......}
 ```
 
 ### Health check
-
 ```bash
-curl http://localhost:8000/health
+http://localhost:8000/health
 ```
-
+**Resposta:**
 ```json
-{"status": "ok", "model_loaded": true, "model_stage": "Production"}
+{"status":"ok","message":"modelo rodando com sucesso"}
 ```
-
 ---
 
 ## ⚡ Inferência
@@ -577,16 +401,6 @@ curl http://localhost:8000/health
 O `service_wrapper.py` mantém o modelo carregado **em memória** durante todo o ciclo
 de vida do processo (carregado uma única vez no evento de `startup` do FastAPI),
 evitando a latência de recarregar pesos do MLflow a cada requisição.
-
-Para usuários com histórico, os candidatos a recomendação são filtrados para excluir
-itens já vistos/comprados (`exclude_seen=True`), e o *scoring* é feito em lote
-(*batched inference*) sobre todos os itens candidatos simultaneamente, aproveitando
-vetorização do PyTorch.
-
-Para o cenário de **cold-start** (usuário novo, sem histórico), a API recorre
-automaticamente a um fallback baseado em popularidade (baseline Scikit-Learn),
-evitando retornar erro ou lista vazia.
-
 ---
 
 ## 📈 Avaliação e Métricas
@@ -606,22 +420,6 @@ Essas 4 métricas atendem ao requisito de **comparação com baselines usando �
 métricas**.
 
 ---
-
-## 📊 Resultados
-
-> Os valores abaixo são ilustrativos e devem ser substituídos pelos números reais
-> obtidos após o treinamento, disponíveis em `documents/eval_metrics.json` e no
-> MLflow UI.
-
-| Modelo | HR@10 | NDCG@10 | Precision@10 | Recall@10 |
-|---|---|---|---|---|
-| Popularity (baseline) | 0.312 | 0.187 | 0.041 | 0.198 |
-| Item-KNN (Scikit-Learn) | 0.401 | 0.245 | 0.058 | 0.261 |
-| **NeuMF (PyTorch)** | **0.512** | **0.318** | **0.079** | **0.334** |
-
-O NeuMF supera consistentemente ambas as baselines em todas as métricas avaliadas,
-confirmando o ganho de capturar interações não-lineares usuário-item via componente
-MLP, complementando o sinal linear do componente GMF.
 
 **Trade-offs observados:**
 - O NeuMF tem custo de treino significativamente maior que os baselines (necessidade de GPU para tempos de treino razoáveis).
